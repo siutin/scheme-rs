@@ -96,7 +96,7 @@ impl fmt::Debug for Procedure {
     }
 }
 
-pub struct Function(pub Rc<Fn(Vec<DataType>, Rc<RefCell<Env>>) -> Result<Option<DataType>, &'static str>>);
+pub struct Function(pub Rc<dyn Fn(Vec<DataType>, Rc<RefCell<Env>>) -> Result<Option<DataType>, &'static str>>);
 
 impl Function {
     fn call(&self, arguments: Vec<DataType>, env: Rc<RefCell<Env>>) -> Result<Option<DataType>, &'static str> {
