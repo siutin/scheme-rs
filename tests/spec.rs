@@ -637,6 +637,11 @@ mod std_function {
     }
 }
 
+#[cfg(test)]
+#[ctor::ctor]
+fn init() {
+    env_logger::init();
+}
 
 #[derive(Debug)]
 struct TestResult {

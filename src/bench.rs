@@ -1,6 +1,5 @@
 // RUN: cargo bench --features "unstable"
 
-#![feature(test)]
 #![cfg_attr(feature = "unstable", feature(test))]
 #[cfg(all(feature = "unstable", test))]
 mod bench {
@@ -12,6 +11,12 @@ mod bench {
     use std::cell::RefCell;
     use std::rc::Rc;
     use bench::scheme_rs::*;
+
+    #[cfg(test)]
+    #[ctor::ctor]
+    fn init() {
+        env_logger::init();
+    }
 
     #[bench]
     fn fact10_bench(b: &mut Bencher) {
