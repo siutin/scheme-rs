@@ -656,12 +656,10 @@ fn default_env() -> Rc<RefCell<Env>> {
 }
 
 fn run(s: &str) -> TestResult {
-    env_logger::init();
     run_with_env(s, default_env().clone())
 }
 
 fn run_with_env(s: &str, env_ref: Rc<RefCell<Env>>) -> TestResult {
-    env_logger::init();
     let result = parse(s)
         .and_then(|ast| eval(Some(ast.result), env_ref.clone()));
 

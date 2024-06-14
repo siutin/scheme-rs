@@ -41,7 +41,6 @@ mod bench {
     }
 
     fn run_with_env(s: &str, env_ref: Rc<RefCell<Env>>) -> TestResult {
-        env_logger::init();
         let result = parse(s)
             .and_then(|ast| eval(Some(ast.result), env_ref.clone()));
 

@@ -11,7 +11,7 @@ use std::io::Write;
 use scheme_rs::*;
 
 fn main() {
-    env_logger::init().unwrap();
+    env_logger::init();
     let local = Box::new(RefCell::new(setup()));
     let env = Env {
         local,

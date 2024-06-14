@@ -15,7 +15,7 @@ use std::rc::Rc;
 use scheme_rs::*;
 
 fn main() {
-    env_logger::init().unwrap();
+    env_logger::init();
 
     let args: Vec<String> = env::args().collect();
     debug!("args: {:?}", args);
