@@ -348,6 +348,35 @@ fn predicates_and_int_div_test() {
 }
 
 #[test]
+fn tco_deep_recursion_test() {
+    // Self-recursive tail call — 100k iterations should not overflow
+    let test_result = run(r#"
+    (define loop
+      (lambda (n)
+        (if (= n 0)
+          'done
+          (loop (- n 1)))))
+    (loop 100000)
+    "#);
+    assert_eq!(Ok(Some(DataType::Symbol("done".to_string()))), test_result.value);
+}
+
+#[test]
+fn tco_mutual_recursion_test() {
+    // Mutual recursion via tail calls — 100k depth should not overflow
+    let test_result = run(r#"
+    (define my-even?
+      (lambda (n)
+        (if (= n 0) #t (my-odd? (- n 1)))))
+    (define my-odd?
+      (lambda (n)
+        (if (= n 0) #f (my-even? (- n 1)))))
+    (my-even? 100000)
+    "#);
+    assert_eq!(Ok(Some(DataType::Bool(true))), test_result.value);
+}
+
+#[test]
 fn tricky_test1 () {
 
     // Testing the case that the 1st element is a children and it returns a function/lambda after an evaluation

@@ -8,7 +8,8 @@ use crate::types::{AST, Procedure, Function, DataType};
 use crate::env::Env;
 use crate::SchemeError;
 
-pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<DataType>, SchemeError> {
+pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Option<DataType>, SchemeError> {
+    loop {
     debug!("eval");
     debug!("{:?}", ast_option);
     match ast_option.clone() {
@@ -20,21 +21,21 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                 }
                 let c_option = s.chars().nth(1);
                 if let Some('t') = c_option {
-                    Ok(Some(DataType::Bool(true)))
+                    return Ok(Some(DataType::Bool(true)));
                 } else if let Some('f') = c_option {
-                    Ok(Some(DataType::Bool(false)))
+                    return Ok(Some(DataType::Bool(false)));
                 } else {
-                    Err("syntax error".into())
+                    return Err("syntax error".into());
                 }
             } else if s.len() > 1 && s.starts_with("'") {
                 let slice = &s[1..s.len()];
-                Ok(Some(DataType::Symbol(slice.to_string())))
+                return Ok(Some(DataType::Symbol(slice.to_string())));
             } else if s.starts_with("\"") && s.ends_with("\"") {
-                Ok(Some(DataType::String((&s[1..s.len() - 1]).to_string())))
+                return Ok(Some(DataType::String((&s[1..s.len() - 1]).to_string())));
             } else {
                 match env.borrow().get(&s) {
-                    Some(data) => Ok(Some(data)),
-                    None => Err("symbol is not defined.".into())
+                    Some(data) => return Ok(Some(data)),
+                    None => return Err("symbol is not defined.".into())
                 }
             }
         }
@@ -59,7 +60,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                         match s1_option {
                             Some(ref ast) => {
                                 match ast2datatype(ast) {
-                                    Ok(data) => Ok(Some(data)),
+                                    Ok(data) => return Ok(Some(data)),
                                     Err(e) => { return Err(e); }
                                 }
                             }
@@ -72,8 +73,9 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                             match eval(Some(cond.clone()), env.clone()) {
                                 Ok(Some(DataType::Bool(b))) => {
                                     match b {
-                                        true => eval(Some(conseq.clone()), env.clone()),
-                                        false => eval(Some(alt.clone()), env.clone())
+                                        // TAIL: reassign and continue instead of recursive eval
+                                        true => { ast_option = Some(conseq.clone()); continue; }
+                                        false => { ast_option = Some(alt.clone()); continue; }
                                     }
                                 }
                                 Ok(_) => { return Err("syntax error".into()); }
@@ -167,8 +169,6 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                             };
 
                             debug!("procedure_env: {:?}", procedure_env);
-                            // Body can be a single expression or a list of expressions.
-                            // Store as-is; eval handles both AST::Children and single AST nodes.
                             let procedure = Procedure {
                                 body: body_ast.clone(),
                                 params: args_meta,
@@ -176,9 +176,9 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                             };
                             debug!("procedure: {:?}", procedure);
 
-                            Ok(Some(DataType::Lambda(procedure)))
+                            return Ok(Some(DataType::Lambda(procedure)));
                         } else {
-                            Err("syntax error".into())
+                            return Err("syntax error".into());
                         }
                     }
                     "let" => {
@@ -204,16 +204,17 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                 local: Box::new(RefCell::new(local)),
                                 parent: Some(Box::new(env.clone())),
                             };
-                            // Body is a single expression (which may be a function call).
-                            // For multiple expressions, users wrap in (begin ...).
-                            eval(Some(body_ast.clone()), Rc::new(RefCell::new(let_env)))
+                            // TAIL: reassign and continue
+                            ast_option = Some(body_ast.clone());
+                            env = Rc::new(RefCell::new(let_env));
+                            continue;
                         } else {
-                            Err("let requires bindings and a body".into())
+                            return Err("let requires bindings and a body".into());
                         }
                     }
                     "cond" => {
                         // (cond (test expr...) ... (else expr...))
-                        let mut result = Ok(Some(DataType::Bool(false)));
+                        let mut tail_expr: Option<AST> = None;
                         for i in 1..list.len() {
                             if let Some(&AST::Children(ref clause)) = list.get(i) {
                                 let test = clause.get(0);
@@ -225,7 +226,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                 };
                                 if is_else {
                                     if let Some(body_ast) = body {
-                                        result = eval(Some(body_ast.clone()), env.clone());
+                                        tail_expr = Some(body_ast.clone());
                                     }
                                     break;
                                 }
@@ -233,7 +234,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                     match eval(Some(test_ast.clone()), env.clone()) {
                                         Ok(Some(DataType::Bool(true))) => {
                                             if let Some(body_ast) = body {
-                                                result = eval(Some(body_ast.clone()), env.clone());
+                                                tail_expr = Some(body_ast.clone());
                                             }
                                             break;
                                         }
@@ -244,7 +245,11 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                 }
                             }
                         }
-                        result
+                        // TAIL: if we found a matching clause, continue with its body
+                        match tail_expr {
+                            Some(expr) => { ast_option = Some(expr); continue; }
+                            None => return Ok(Some(DataType::Bool(false))),
+                        }
                     }
                     "set!" => {
                         // (set! var expr) — mutate existing binding
@@ -252,48 +257,56 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                             match eval(Some(val_ast.clone()), env.clone()) {
                                 Ok(Some(val)) => {
                                     if env.borrow().set(name, val) {
-                                        Ok(None)
+                                        return Ok(None);
                                     } else {
-                                        Err(SchemeError::UndefinedSymbol(name.clone()))
+                                        return Err(SchemeError::UndefinedSymbol(name.clone()));
                                     }
                                 }
                                 Ok(None) => {
                                     if env.borrow().set(name, DataType::Bool(false)) {
-                                        Ok(None)
+                                        return Ok(None);
                                     } else {
-                                        Err(SchemeError::UndefinedSymbol(name.clone()))
+                                        return Err(SchemeError::UndefinedSymbol(name.clone()));
                                     }
                                 }
-                                Err(e) => Err(e),
+                                Err(e) => return Err(e),
                             }
                         } else {
-                            Err("set! requires a symbol and a value".into())
+                            return Err("set! requires a symbol and a value".into());
                         }
                     }
                     "when" => {
                         // (when test body) — eval body if test is true
                         if let (Some(test_ast), Some(body_ast)) = (s1, s2) {
                             match eval(Some(test_ast.clone()), env.clone()) {
-                                Ok(Some(DataType::Bool(true))) => eval(Some(body_ast.clone()), env.clone()),
-                                Ok(Some(DataType::Bool(false))) | Ok(None) => Ok(None),
-                                Ok(_) => Err("when requires a boolean test".into()),
-                                Err(e) => Err(e),
+                                Ok(Some(DataType::Bool(true))) => {
+                                    // TAIL
+                                    ast_option = Some(body_ast.clone());
+                                    continue;
+                                }
+                                Ok(Some(DataType::Bool(false))) | Ok(None) => return Ok(None),
+                                Ok(_) => return Err("when requires a boolean test".into()),
+                                Err(e) => return Err(e),
                             }
                         } else {
-                            Err("when requires a test and a body".into())
+                            return Err("when requires a test and a body".into());
                         }
                     }
                     "unless" => {
                         // (unless test body) — eval body if test is false
                         if let (Some(test_ast), Some(body_ast)) = (s1, s2) {
                             match eval(Some(test_ast.clone()), env.clone()) {
-                                Ok(Some(DataType::Bool(false))) => eval(Some(body_ast.clone()), env.clone()),
-                                Ok(Some(DataType::Bool(true))) | Ok(None) => Ok(None),
-                                Ok(_) => Err("unless requires a boolean test".into()),
-                                Err(e) => Err(e),
+                                Ok(Some(DataType::Bool(false))) => {
+                                    // TAIL
+                                    ast_option = Some(body_ast.clone());
+                                    continue;
+                                }
+                                Ok(Some(DataType::Bool(true))) | Ok(None) => return Ok(None),
+                                Ok(_) => return Err("unless requires a boolean test".into()),
+                                Err(e) => return Err(e),
                             }
                         } else {
-                            Err("unless requires a test and a body".into())
+                            return Err("unless requires a test and a body".into());
                         }
                     }
                     "case" => {
@@ -301,7 +314,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                         if let Some(key_ast) = s1 {
                             match eval(Some(key_ast.clone()), env.clone()) {
                                 Ok(Some(key_val)) => {
-                                    let mut result = Ok(Some(DataType::Bool(false)));
+                                    let mut tail_expr: Option<AST> = None;
                                     for i in 2..list.len() {
                                         if let Some(&AST::Children(ref clause)) = list.get(i) {
                                             let vals = clause.get(0);
@@ -313,7 +326,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                             };
                                             if is_else {
                                                 if let Some(body_ast) = body {
-                                                    result = eval(Some(body_ast.clone()), env.clone());
+                                                    tail_expr = Some(body_ast.clone());
                                                 }
                                                 break;
                                             }
@@ -328,20 +341,24 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                                 });
                                                 if matched {
                                                     if let Some(body_ast) = body {
-                                                        result = eval(Some(body_ast.clone()), env.clone());
+                                                        tail_expr = Some(body_ast.clone());
                                                     }
                                                     break;
                                                 }
                                             }
                                         }
                                     }
-                                    result
+                                    // TAIL
+                                    match tail_expr {
+                                        Some(expr) => { ast_option = Some(expr); continue; }
+                                        None => return Ok(Some(DataType::Bool(false))),
+                                    }
                                 }
-                                Ok(None) => Ok(None),
-                                Err(e) => Err(e),
+                                Ok(None) => return Ok(None),
+                                Err(e) => return Err(e),
                             }
                         } else {
-                            Err("case requires a key".into())
+                            return Err("case requires a key".into());
                         }
                     }
                     _ => {
@@ -359,7 +376,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                         match data_option {
                             Some(DataType::Proc(ref f)) => {
                                 let slice = &list[1..list.len()];
-                                execute(f, slice, env)
+                                return execute(f, slice, env);
                             }
                             Some(DataType::Lambda(ref mut p)) => {
                                 debug!("first elm symbol - lambda: {:?}", p);
@@ -384,12 +401,15 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                         };
 
                                         debug!("proc_env: {:?}", proc_env);
-                                        return eval(Some(p.body.clone()), Rc::new(RefCell::new(proc_env)));
+                                        // TAIL: reassign and continue
+                                        ast_option = Some(p.body.clone());
+                                        env = Rc::new(RefCell::new(proc_env));
+                                        continue;
                                     }
                                     Err(e) => return Err(e)
                                 }
                             }
-                            Some(_) | None => Err("symbol is not defined.".into())
+                            Some(_) | None => return Err("symbol is not defined.".into())
                         }
                     }
                 }
@@ -404,10 +424,10 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                     match eval(Some(list.first().unwrap().clone()), env.clone()) {
                         Ok(Some(DataType::Proc(ref f))) => {
                             debug!("first elm function - function: {:?}", f);
-                            match rest_option {
+                            return match rest_option {
                                 Some(rest) => execute(f, rest, env),
                                 None => execute(f, &vec![], env)
-                            }
+                            };
                         }
                         Ok(Some(DataType::Lambda(ref mut p))) => {
                             debug!("first elm lambda - lambda: {:?} - procedure params: {:?}", p, p.params);
@@ -440,7 +460,10 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                 }
                             };
                             debug!("proc_env: {:?}", proc_env);
-                            return eval(Some(p.body.clone()), Rc::new(RefCell::new(proc_env)));
+                            // TAIL: reassign and continue
+                            ast_option = Some(p.body.clone());
+                            env = Rc::new(RefCell::new(proc_env));
+                            continue;
                         }
                         Ok(_) => { return Err("unsupported data type on first element".into()); }
                         Err(e) => { return Err(e); }
@@ -458,9 +481,10 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                 Some(_) => return Err(SchemeError::RuntimeError("internal error: unexpected state".into())),
                 None => None
             };
-            Ok(data)
+            return Ok(data);
         }
     }
+    } // end loop
 }
 
 fn prepare_arguments(arguments: &[AST], env: Rc<RefCell<Env>>) -> Result<Vec<DataType>, SchemeError> {

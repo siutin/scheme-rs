@@ -229,23 +229,23 @@
 
 > **Spec**: `projects/SPEC_TCO.md`
 
-- [ ] **Task 27: Convert `eval` to a trampoline loop**
+- [x] **Task 27: Convert `eval` to a trampoline loop**
   - Acceptance: `eval` body is wrapped in `loop { ... }`. Tail positions (`if` branches, `cond`/`when`/`unless`/`case` bodies, `let` body, lambda body) use `continue` with reassigned `ast`/`env` instead of recursive `eval` calls. Non-tail positions (arguments, tests, bindings) still use recursive calls.
   - Verify: `cargo build` succeeds, all 47 existing tests pass
   - Files: `src/eval.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
-- [ ] **Task 28: Add deep recursion tests**
+- [x] **Task 28: Add deep recursion tests**
   - Acceptance: `(loop 100000)` where `loop` is a self-recursive tail function returns without stack overflow. Mutual recursion (even/odd) at 100k depth also works.
-  - Verify: New tests `tco_deep_recursion_test` and `tco_mutual_recursion_test` pass, all 47 existing tests pass
+  - Verify: New tests `tco_deep_recursion_test` and `tco_mutual_recursion_test` pass, all 49 tests pass
   - Files: `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 ### Checkpoint: TCO
-- [ ] Deep recursion (100k+) doesn't overflow stack
-- [ ] Mutual recursion (100k+) doesn't overflow stack
-- [ ] All 49+ tests pass (47 existing + 2 new)
-- [ ] Zero compiler warnings
+- [x] Deep recursion (100k+) doesn't overflow stack
+- [x] Mutual recursion (100k+) doesn't overflow stack
+- [x] All 49 tests pass (was 47, added 2 new)
+- [x] Zero compiler warnings
 
 ---
 
