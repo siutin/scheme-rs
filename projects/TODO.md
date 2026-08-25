@@ -104,24 +104,24 @@
   - Files: `src/eval.rs` (new), `src/lib.rs`
   - Status: `[x]` done
 
-- [ ] **Task 13: Extract `builtins.rs`**
+- [x] **Task 13: Extract `builtins.rs`**
   - Acceptance: `setup()` and all builtin function definitions live in `src/builtins.rs`. `define_comparison!` macro also moves there.
   - Verify: `cargo build` succeeds, `cargo test` passes (30+)
   - Files: `src/builtins.rs` (new), `src/lib.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
-- [ ] **Task 14: Clean up `lib.rs` to re-export hub**
+- [x] **Task 14: Clean up `lib.rs` to re-export hub**
   - Acceptance: `lib.rs` is under 100 lines — just `mod` declarations, re-exports, and the `define_comparison!` macro if needed. No logic in `lib.rs`.
   - Verify: `cargo build` succeeds, `cargo test` passes (30+), `wc -l src/lib.rs` < 100
   - Files: `src/lib.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 ### Checkpoint: Complete
-- [ ] `lib.rs` is under 100 lines
-- [ ] All modules compile independently
-- [ ] All 30+ tests pass
-- [ ] Zero compiler warnings
-- [ ] `projects/TODO.md` updated with final status
+- [x] `lib.rs` is under 100 lines
+- [x] All modules compile independently
+- [x] All 30+ tests pass
+- [x] Zero compiler warnings
+- [x] `projects/TODO.md` updated with final status
 
 ---
 
