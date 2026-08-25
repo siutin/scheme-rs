@@ -37,6 +37,32 @@ fn quote_expression_test() {
 }
 
 #[test]
+fn quote_shorthand_test() {
+    // 'symbol should work (no space)
+    assert_eq!(Ok(Some(DataType::Symbol("foo".to_string()))), run("'foo").value);
+    // '(1 2 3) should work — quote shorthand for lists
+    assert_eq!(Ok(Some(DataType::List(vec![
+        DataType::Number(1.0),
+        DataType::Number(2.0),
+        DataType::Number(3.0),
+    ]))), run("'(1 2 3)").value);
+    // '(a b c) — list of symbols
+    assert_eq!(Ok(Some(DataType::List(vec![
+        DataType::Symbol("a".to_string()),
+        DataType::Symbol("b".to_string()),
+        DataType::Symbol("c".to_string()),
+    ]))), run("'(a b c)").value);
+    // Nested quote shorthand
+    assert_eq!(Ok(Some(DataType::List(vec![
+        DataType::Number(1.0),
+        DataType::List(vec![
+            DataType::Number(2.0),
+            DataType::Number(3.0),
+        ]),
+    ]))), run("'(1 (2 3))").value);
+}
+
+#[test]
 fn variable_retrieving_test() {
     let test_result = run("(define r 10)(* pi (* r r))");
     assert_eq!(Ok(Some(DataType::Number(314.1592653589793))), test_result.value);

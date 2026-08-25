@@ -46,11 +46,11 @@
   - Files: `src/lib.rs` (or `builtins.rs` if module split done), `tests/spec.rs`
   - Status: `[x]` done
 
-- [ ] **Task 5: Fix quote shorthand for lists**
+- [x] **Task 5: Fix quote shorthand for lists**
   - Acceptance: `'(1 2 3)` works the same as `(quote (1 2 3))`. `'symbol` still works.
-  - Verify: New test `quote_shorthand_test` in `tests/spec.rs` passes, all existing tests pass
+  - Verify: New test `quote_shorthand_test` in `tests/spec.rs` passes, all 32 tests pass
   - Files: `src/lib.rs` (or `parser.rs`), `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 - [ ] **Task 6: Fix division by zero**
   - Acceptance: `(/ 1 0)` returns `Err(SchemeError::DivisionByZero)`, not `inf`

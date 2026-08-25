@@ -297,6 +297,22 @@ fn read_from_tokens(mut tokens: Vec<String>) -> Result<ReadFromTokenResult, Sche
             )
         } else if token == ")" {
             Err("unexpected )".into())
+        } else if token == "'" {
+            // Quote shorthand: read the next form and wrap in (quote <form>)
+            if tokens.is_empty() {
+                return Err("unexpected EOF after quote".into());
+            }
+            match read_from_tokens(tokens) {
+                Ok(data) => {
+                    Ok(
+                        ReadFromTokenResult {
+                            remain: data.remain,
+                            result: AST::Children(vec![AST::Symbol("quote".to_string()), data.result])
+                        }
+                    )
+                }
+                Err(e) => Err(e)
+            }
         } else {
             Ok(
                 ReadFromTokenResult {
