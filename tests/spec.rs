@@ -414,6 +414,35 @@ fn null_pred_test() {
 }
 
 #[test]
+fn multi_expr_body_test() {
+    // Lambda with multi-expression body (no explicit begin)
+    assert_eq!(Ok(Some(DataType::Integer(42))),
+        run("((lambda (x) (display x) (+ x 1)) 41)").value);
+    // let with multi-expression body
+    assert_eq!(Ok(Some(DataType::Integer(7))),
+        run("(let ((x 5)) (display x) (+ x 2))").value);
+    // when with multi-expression body
+    assert_eq!(Ok(Some(DataType::Integer(10))),
+        run("(when #t (display 1) (display 2) 10)").value);
+    // unless with multi-expression body
+    assert_eq!(Ok(Some(DataType::Integer(20))),
+        run("(unless #f (display 1) 20)").value);
+}
+
+#[test]
+fn internal_define_test() {
+    // Internal define in lambda body
+    assert_eq!(Ok(Some(DataType::Integer(5))),
+        run("((lambda () (define x 5) x))").value);
+    // Internal define in let body
+    assert_eq!(Ok(Some(DataType::Integer(42))),
+        run("(let () (define y 42) y)").value);
+    // Internal define + use in same body
+    assert_eq!(Ok(Some(DataType::Integer(30))),
+        run("((lambda (a) (define b 10) (+ a b)) 20)").value);
+}
+
+#[test]
 fn tricky_test1 () {
 
     // Testing the case that the 1st element is a children and it returns a function/lambda after an evaluation

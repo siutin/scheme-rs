@@ -142,10 +142,23 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                     }
                     "lambda" => {
                         debug!("lambda-expression");
-                        if let (Some(&AST::Children(ref args)), Some(body_ast)) = (s1, s2) {
-                            debug!("ENV: {:?}", env);
-                            debug!("args: {:?}", args);
-                            debug!("body: {:?}", body_ast);
+                        if let (Some(&AST::Children(ref args)), Some(_)) = (s1, s2) {
+                            // Body is all expressions after args: list[2..]
+                            let body_exprs = &list[2..];
+                            if body_exprs.is_empty() {
+                                return Err("lambda requires a body".into());
+                            }
+
+                            // Convert multi-expression body into implicit begin
+                            let body_ast = if body_exprs.len() == 1 {
+                                body_exprs[0].clone()
+                            } else {
+                                AST::Children(
+                                    std::iter::once(AST::Symbol("begin".to_string()))
+                                        .chain(body_exprs.iter().cloned())
+                                        .collect()
+                                )
+                            };
 
                             // convert args AST to Datatype symbol
                             let args_result: Result<Vec<_>, SchemeError> = args.iter().map(|ref arg|
@@ -168,13 +181,11 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                                 parent: Some(parent_env_box)
                             };
 
-                            debug!("procedure_env: {:?}", procedure_env);
                             let procedure = Procedure {
-                                body: Rc::new(body_ast.clone()),
+                                body: Rc::new(body_ast),
                                 params: args_meta,
                                 env: Rc::new(RefCell::new(procedure_env))
                             };
-                            debug!("procedure: {:?}", procedure);
 
                             return Ok(Some(DataType::Lambda(procedure)));
                         } else {
@@ -183,7 +194,11 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                     }
                     "let" => {
                         // (let ((var init) ...) body...)
-                        if let (Some(&AST::Children(ref bindings)), Some(body_ast)) = (s1, s2) {
+                        if let (Some(&AST::Children(ref bindings)), Some(_)) = (s1, s2) {
+                            let body_exprs = &list[2..];
+                            if body_exprs.is_empty() {
+                                return Err("let requires a body".into());
+                            }
                             let mut local = HashMap::new();
                             for binding in bindings.iter() {
                                 if let AST::Children(ref pair) = binding {
@@ -204,8 +219,18 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                                 local: Box::new(RefCell::new(local)),
                                 parent: Some(Box::new(env.clone())),
                             };
+                            // Convert multi-expression body into implicit begin
+                            let body_ast = if body_exprs.len() == 1 {
+                                body_exprs[0].clone()
+                            } else {
+                                AST::Children(
+                                    std::iter::once(AST::Symbol("begin".to_string()))
+                                        .chain(body_exprs.iter().cloned())
+                                        .collect()
+                                )
+                            };
                             // TAIL: reassign and continue
-                            ast_option = Some(body_ast.clone());
+                            ast_option = Some(body_ast);
                             env = Rc::new(RefCell::new(let_env));
                             continue;
                         } else {
@@ -276,12 +301,26 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                         }
                     }
                     "when" => {
-                        // (when test body) — eval body if test is true
-                        if let (Some(test_ast), Some(body_ast)) = (s1, s2) {
+                        // (when test body...) — eval body if test is true
+                        if let Some(test_ast) = s1 {
+                            let body_exprs = &list[2..];
+                            if body_exprs.is_empty() {
+                                return Err("when requires a body".into());
+                            }
                             match eval(Some(test_ast.clone()), env.clone()) {
                                 Ok(Some(DataType::Bool(true))) => {
+                                    // Convert multi-expression body into implicit begin
+                                    let body_ast = if body_exprs.len() == 1 {
+                                        body_exprs[0].clone()
+                                    } else {
+                                        AST::Children(
+                                            std::iter::once(AST::Symbol("begin".to_string()))
+                                                .chain(body_exprs.iter().cloned())
+                                                .collect()
+                                        )
+                                    };
                                     // TAIL
-                                    ast_option = Some(body_ast.clone());
+                                    ast_option = Some(body_ast);
                                     continue;
                                 }
                                 Ok(Some(DataType::Bool(false))) | Ok(None) => return Ok(None),
@@ -293,12 +332,26 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                         }
                     }
                     "unless" => {
-                        // (unless test body) — eval body if test is false
-                        if let (Some(test_ast), Some(body_ast)) = (s1, s2) {
+                        // (unless test body...) — eval body if test is false
+                        if let Some(test_ast) = s1 {
+                            let body_exprs = &list[2..];
+                            if body_exprs.is_empty() {
+                                return Err("unless requires a body".into());
+                            }
                             match eval(Some(test_ast.clone()), env.clone()) {
                                 Ok(Some(DataType::Bool(false))) => {
+                                    // Convert multi-expression body into implicit begin
+                                    let body_ast = if body_exprs.len() == 1 {
+                                        body_exprs[0].clone()
+                                    } else {
+                                        AST::Children(
+                                            std::iter::once(AST::Symbol("begin".to_string()))
+                                                .chain(body_exprs.iter().cloned())
+                                                .collect()
+                                        )
+                                    };
                                     // TAIL
-                                    ast_option = Some(body_ast.clone());
+                                    ast_option = Some(body_ast);
                                     continue;
                                 }
                                 Ok(Some(DataType::Bool(true))) | Ok(None) => return Ok(None),

@@ -367,17 +367,17 @@
 
 ### Bug Fixes
 
-- [ ] **Task 38: Multi-expression bodies for lambda, let, when, unless**
+- [x] **Task 38: Multi-expression bodies for lambda, let, when, unless**
   - Acceptance: `(lambda (x) (display x) x)` works without explicit `begin`. `let`, `when`, `unless` also support multi-expression bodies.
-  - Verify: New test `multi_expr_body_test` passes, all 52 existing tests pass
+  - Verify: New test `multi_expr_body_test` passes, all 54 tests pass
   - Files: `src/eval.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
-- [ ] **Task 39: Verify internal define works**
+- [x] **Task 39: Verify internal define works**
   - Acceptance: `(let () (define x 5) x)` returns 5. `(lambda () (define x 5) x)` works.
   - Verify: New test `internal_define_test` passes
   - Files: `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 ### R5RS Features
 
