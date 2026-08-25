@@ -80,11 +80,11 @@
   - Files: `src/types.rs` (new), `src/lib.rs`
   - Status: `[x]` done
 
-- [ ] **Task 9: Extract `error.rs`**
+- [x] **Task 9: Extract `error.rs`**
   - Acceptance: `SchemeError` enum lives in `src/error.rs`. `lib.rs` imports from `error`.
   - Verify: `cargo build` succeeds, `cargo test` passes (30+)
   - Files: `src/error.rs` (new), `src/lib.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 - [ ] **Task 10: Extract `parser.rs`**
   - Acceptance: `tokenize`, `read_from_tokens`, `atom`, `parse`, `ReadFromTokenResult` live in `src/parser.rs`.
