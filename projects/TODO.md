@@ -302,6 +302,52 @@
 
 ---
 
+## Phase 9: Examples, Benchmarks, and Performance (`perf`)
+
+> **Spec**: `projects/SPEC_PERF.md`
+
+### Examples
+
+- [ ] **Task 34: Create example .scm files**
+  - Acceptance: `examples/fact.scm`, `examples/fib.scm`, `examples/loop.scm`, `examples/list.scm`, `examples/closures.scm` all run without error via `cargo run --bin scheme -- examples/<file>.scm`
+  - Verify: Each file runs and produces expected output
+  - Files: `examples/fact.scm`, `examples/fib.scm`, `examples/loop.scm`, `examples/list.scm`, `examples/closures.scm`
+  - Status: `[ ]`
+
+### Missing Builtins
+
+- [ ] **Task 35: Add `null?` builtin**
+  - Acceptance: `(null? '())` → `#t`, `(null? (list 1))` → `#f`. Needed for list operations in examples.
+  - Verify: New test `null_pred_test` passes, all 51 existing tests pass
+  - Files: `src/builtins.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+### Benchmarks
+
+- [ ] **Task 36: Expand benchmark suite**
+  - Acceptance: `bench.rs` has 6 benchmarks: fact20, fib25, tco_loop_100k, sum_to_1000, ackermann_2_8, list_ops. All compile and run via `cargo bench --features "unstable"`.
+  - Verify: `cargo bench --features "unstable"` runs all 6 benchmarks
+  - Files: `src/bench.rs`
+  - Status: `[ ]`
+
+### Performance
+
+- [ ] **Task 37: Reduce eval loop overhead**
+  - Acceptance: TCO loop benchmark is at least 2x faster than baseline (was ~2.9µs/iter, target <1.5µs/iter). Achieved by reducing unnecessary clones in the eval loop.
+  - Verify: `cargo bench --features "unstable"` shows improvement, all 51 tests pass
+  - Files: `src/eval.rs`
+  - Status: `[ ]`
+
+### Checkpoint: Examples, Benchmarks, and Performance
+- [ ] 5 example .scm files run correctly
+- [ ] `null?` builtin works
+- [ ] 6 benchmarks run via `cargo bench`
+- [ ] TCO loop is at least 2x faster
+- [ ] All 51+ tests pass
+- [ ] Zero compiler warnings
+
+---
+
 ## Known Issues (Deferred — Not in This Round)
 
 - [ ] **Advanced R5RS features deferred**: `quasiquote`/`unquote`, `do` loops, named `let`, macros (`define-syntax`/`syntax-rules`), `call/cc`.
