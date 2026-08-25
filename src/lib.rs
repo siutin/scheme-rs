@@ -1,13 +1,11 @@
-#[macro_use]
-extern crate log;
-extern crate env_logger;
-
 //use std;
 use std::collections::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::fmt;
 use std::f64;
+
+use log::debug;
 
 #[macro_export]
 macro_rules! tuplet {

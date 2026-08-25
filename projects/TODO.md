@@ -11,11 +11,11 @@
 
 ## Phase 1: Foundation (`codequality`)
 
-- [ ] **Task 1: Bump to edition 2021, remove `extern crate`**
+- [x] **Task 1: Bump to edition 2021, remove `extern crate`**
   - Acceptance: `Cargo.toml` has `edition = "2021"`, no `extern crate` in any `.rs` file
   - Verify: `cargo build --release` succeeds, `cargo test` passes (30/30)
   - Files: `Cargo.toml`, `src/lib.rs`, `src/main.rs`, `src/cli.rs`, `src/bench.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 - [ ] **Task 2: Create `SchemeError` enum, replace `&'static str`**
   - Acceptance: All `Result<_, &'static str>` become `Result<_, SchemeError>`. `SchemeError` implements `Display` + `std::error::Error`. Variants: `SyntaxError`, `TypeError`, `UndefinedSymbol`, `ArityError`, `DivisionByZero`, `RuntimeError`.

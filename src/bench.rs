@@ -3,11 +3,7 @@
 #![cfg_attr(feature = "unstable", feature(test))]
 #[cfg(all(feature = "unstable", test))]
 mod bench {
-    extern crate scheme_rs;
-    extern crate log;
-    extern crate env_logger;
-    extern crate test;
-    use self::test::Bencher;
+    use test::Bencher;
     use std::cell::RefCell;
     use std::rc::Rc;
     use bench::scheme_rs::*;

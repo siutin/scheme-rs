@@ -1,8 +1,3 @@
-extern crate scheme_rs;
-
-extern crate log;
-extern crate env_logger;
-
 use std::cell::RefCell;
 use std::rc::Rc;
 use scheme_rs::*;
