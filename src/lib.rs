@@ -4,8 +4,55 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::fmt;
 use std::f64;
+use std::error::Error;
 
 use log::debug;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SchemeError {
+    SyntaxError(String),
+    TypeError(String),
+    UndefinedSymbol(String),
+    ArityError(String),
+    DivisionByZero,
+    RuntimeError(String),
+}
+
+impl fmt::Display for SchemeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            SchemeError::SyntaxError(msg) => write!(f, "syntax error: {}", msg),
+            SchemeError::TypeError(msg) => write!(f, "type error: {}", msg),
+            SchemeError::UndefinedSymbol(msg) => write!(f, "undefined symbol: {}", msg),
+            SchemeError::ArityError(msg) => write!(f, "arity error: {}", msg),
+            SchemeError::DivisionByZero => write!(f, "division by zero"),
+            SchemeError::RuntimeError(msg) => write!(f, "runtime error: {}", msg),
+        }
+    }
+}
+
+impl Error for SchemeError {}
+
+impl From<&'static str> for SchemeError {
+    fn from(s: &'static str) -> Self {
+        if s.contains("not defined") {
+            SchemeError::UndefinedSymbol(s.to_string())
+        } else if s.contains("syntax") || s.contains("unexpected") || s.contains("end quote")
+            || s.contains("number of parts") || s.contains("lambda argument")
+            || s.contains("unsupported data type")
+        {
+            SchemeError::SyntaxError(s.to_string())
+        } else if s.contains("wrong argument datatype") || s.contains("wrong type")
+            || s.contains("of type '") || s.contains("requires an argument of type")
+        {
+            SchemeError::TypeError(s.to_string())
+        } else if s.contains("requires") && s.contains("argument") {
+            SchemeError::ArityError(s.to_string())
+        } else {
+            SchemeError::RuntimeError(s.to_string())
+        }
+    }
+}
 
 #[macro_export]
 macro_rules! tuplet {
@@ -39,7 +86,7 @@ macro_rules! define_comparison {
         let $proc = DataType::Proc(Function( Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
                 debug!("Function - name: {:?} - Args: {:?}", stringify!($name), vec);
                 if vec.len() != 2 {
-                    return Err("function requires 2 arguments only");
+                    return Err("function requires 2 arguments only".into());
                 }
                 tuplet!((a,b) = vec);
 
@@ -50,7 +97,7 @@ macro_rules! define_comparison {
                     debug!("Description: {}", desc);
                     Ok(Some(DataType::Bool($func(a1, b1))))
                 } else {
-                    return Err("wrong argument datatype");
+                    return Err("wrong argument datatype".into());
                 }
 
             })));
@@ -94,10 +141,10 @@ impl fmt::Debug for Procedure {
     }
 }
 
-pub struct Function(pub Rc<dyn Fn(Vec<DataType>, Rc<RefCell<Env>>) -> Result<Option<DataType>, &'static str>>);
+pub struct Function(pub Rc<dyn Fn(Vec<DataType>, Rc<RefCell<Env>>) -> Result<Option<DataType>, SchemeError>>);
 
 impl Function {
-    fn call(&self, arguments: Vec<DataType>, env: Rc<RefCell<Env>>) -> Result<Option<DataType>, &'static str> {
+    fn call(&self, arguments: Vec<DataType>, env: Rc<RefCell<Env>>) -> Result<Option<DataType>, SchemeError> {
         (self.0)(arguments, env)
     }
 }
@@ -183,7 +230,7 @@ impl Env {
     }
 }
 
-pub fn parse(program: &str) -> Result<ReadFromTokenResult, &'static str> {
+pub fn parse(program: &str) -> Result<ReadFromTokenResult, SchemeError> {
     debug!("program: {}", program);
     let wrap_program = format!("(begin {})", program);
 
@@ -211,7 +258,7 @@ fn tokenize(program: &str) -> Vec<String>
     ss
 }
 
-fn read_from_tokens(mut tokens: Vec<String>) -> Result<ReadFromTokenResult, &'static str> {
+fn read_from_tokens(mut tokens: Vec<String>) -> Result<ReadFromTokenResult, SchemeError> {
     if tokens.len() > 0 {
         let token = tokens.remove(0);
 
@@ -220,7 +267,7 @@ fn read_from_tokens(mut tokens: Vec<String>) -> Result<ReadFromTokenResult, &'st
             let mut tmp_tokens = tokens.clone();
 
             if tmp_tokens.is_empty() {
-                return Err("syntax error");
+                return Err("syntax error".into());
             }
 
             while !tmp_tokens.is_empty() {
@@ -250,7 +297,7 @@ fn read_from_tokens(mut tokens: Vec<String>) -> Result<ReadFromTokenResult, &'st
                                 vec.push(AST::Symbol(str_result));
                                 tmp_tokens = rest_tokens.clone();
                             }
-                            None => { return Err("can not find an end quote"); }
+                            None => { return Err("can not find an end quote".into()); }
                         }
                     } else {
                         match read_from_tokens(tmp_tokens.clone()) {
@@ -264,7 +311,7 @@ fn read_from_tokens(mut tokens: Vec<String>) -> Result<ReadFromTokenResult, &'st
                 }
             }
             if tmp_tokens.is_empty() {
-                return Err("syntax error");
+                return Err("syntax error".into());
             }
             tmp_tokens.remove(0);
             Ok(
@@ -274,7 +321,7 @@ fn read_from_tokens(mut tokens: Vec<String>) -> Result<ReadFromTokenResult, &'st
                 }
             )
         } else if token == ")" {
-            Err("unexpected )")
+            Err("unexpected )".into())
         } else {
             Ok(
                 ReadFromTokenResult {
@@ -284,7 +331,7 @@ fn read_from_tokens(mut tokens: Vec<String>) -> Result<ReadFromTokenResult, &'st
             )
         }
     } else {
-        Err("unexpected EOF while reading")
+        Err("unexpected EOF while reading".into())
     }
 }
 
@@ -301,7 +348,7 @@ fn atom(token: &str) -> AST {
     }
 }
 
-pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<DataType>, &'static str> {
+pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<DataType>, SchemeError> {
     debug!("eval");
     debug!("{:?}", ast_option);
     match ast_option.clone() {
@@ -309,7 +356,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
             debug!("ast is a symbol: {:?}", s);
             if s.starts_with("#") {
                 if s.len() != 2 {
-                    return Err("syntax error");
+                    return Err("syntax error".into());
                 }
                 let c_option = s.chars().nth(1);
                 if let Some('t') = c_option {
@@ -317,7 +364,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                 } else if let Some('f') = c_option {
                     Ok(Some(DataType::Bool(false)))
                 } else {
-                    Err("syntax error")
+                    Err("syntax error".into())
                 }
             } else if s.len() > 1 && s.starts_with("'") {
                 let slice = &s[1..s.len()];
@@ -327,7 +374,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
             } else {
                 match env.borrow().get(&s) {
                     Some(data) => Ok(Some(data)),
-                    None => Err("symbol is not defined.")
+                    None => Err("symbol is not defined.".into())
                 }
             }
         }
@@ -335,7 +382,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
             debug!("ast is a children: {:?}", list);
 
             if list.is_empty() {
-                return Err("syntax error");
+                return Err("syntax error".into());
             }
 
             tuplet!((s0,s1,s2,s3) = list);
@@ -353,7 +400,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                     Err(e) => { return Err(e); }
                                 }
                             }
-                            None => { return Err("wrong number of parts"); }
+                            None => { return Err("wrong number of parts".into()); }
                         }
                     }
                     "if" => {
@@ -366,11 +413,11 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                         false => eval(Some(alt.clone()), env.clone())
                                     }
                                 }
-                                Ok(_) => { return Err("syntax error"); }
+                                Ok(_) => { return Err("syntax error".into()); }
                                 Err(e) => { return Err(e); }
                             }
                         } else {
-                            return Err("wrong syntax for if expression");
+                            return Err("wrong syntax for if expression".into());
                         }
                     }
                     "define" => {
@@ -394,7 +441,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                             let env_borrow_mut = env.borrow_mut();
                                             env_borrow_mut.local.borrow_mut().insert(s1.clone(), DataType::Bool(false));
                                         } else {
-                                            return Err("syntax error");
+                                            return Err("syntax error".into());
                                         }
                                     } else if s.starts_with("\"") && s.ends_with("\"") {
                                         let env_borrow_mut = env.borrow_mut();
@@ -405,7 +452,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                             let env_borrow_mut = env.borrow_mut();
                                             env_borrow_mut.local.borrow_mut().insert(s1.clone(), data);
                                         } else {
-                                            return Err("symbol is not defined");
+                                            return Err("symbol is not defined".into());
                                         }
                                     }
                                 }
@@ -426,7 +473,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                             }
                             return Ok(None);
                         }
-                        return Err("wrong syntax for define expression");
+                        return Err("wrong syntax for define expression".into());
                     }
                     "lambda" => {
                         debug!("lambda-expression");
@@ -436,14 +483,14 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                             debug!("body: {:?}", body);
 
                             // convert args AST to Datatype symbol
-                            let args_result: Result<Vec<_>, _> = args.iter().map(|ref arg|
+                            let args_result: Result<Vec<_>, SchemeError> = args.iter().map(|ref arg|
                                 match arg {
                                     &&AST::Symbol(ref arg_string) => Ok(DataType::Symbol(arg_string.to_string())),
-                                    _ => Err("lambda argument must be a symbol")
+                                    _ => Err("lambda argument must be a symbol".into())
                                 }
                             ).collect();
 
-                            if let Result::Err(ref e) = args_result { return Err(e); }
+                            if let Result::Err(ref e) = args_result { return Err(e.clone()); }
 
                             let args_meta = args_result.unwrap().iter()
                                 .map(|ref mut x| x.clone())
@@ -466,7 +513,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
 
                             Ok(Some(DataType::Lambda(procedure)))
                         } else {
-                            Err("syntax error")
+                            Err("syntax error".into())
                         }
                     }
                     _ => {
@@ -514,7 +561,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                     Err(e) => return Err(e)
                                 }
                             }
-                            Some(_) | None => Err("symbol is not defined.")
+                            Some(_) | None => Err("symbol is not defined.".into())
                         }
                     }
                 }
@@ -567,11 +614,11 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                             debug!("proc_env: {:?}", proc_env);
                             return eval(Some(p.body.clone()), Rc::new(RefCell::new(proc_env)));
                         }
-                        Ok(_) => { return Err("unsupported data type on first element"); }
+                        Ok(_) => { return Err("unsupported data type on first element".into()); }
                         Err(e) => { return Err(e); }
                     }
                 } else {
-                    return Err("syntax error");
+                    return Err("syntax error".into());
                 }
             }
         }
@@ -588,12 +635,12 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
     }
 }
 
-fn prepare_arguments(arguments: &[AST], env: Rc<RefCell<Env>>) -> Result<Vec<DataType>, &'static str> {
+fn prepare_arguments(arguments: &[AST], env: Rc<RefCell<Env>>) -> Result<Vec<DataType>, SchemeError> {
     let args_result: Result<Vec<_>, _> = arguments.iter()
         .map(|x| eval(Some(x.clone()), env.clone()))
         .collect();
     debug!("args: {:?}", args_result);
-    if let Result::Err(ref e) = args_result { return Err(e); }
+    if let Result::Err(ref e) = args_result { return Err(e.clone()); }
 
     let args = args_result.unwrap().iter()
         .filter(|x| x.is_some())
@@ -602,7 +649,7 @@ fn prepare_arguments(arguments: &[AST], env: Rc<RefCell<Env>>) -> Result<Vec<Dat
     Ok(args)
 }
 
-fn execute(f: &Function, arguments: &[AST], env: Rc<RefCell<Env>>) -> Result<Option<DataType>, &'static str> {
+fn execute(f: &Function, arguments: &[AST], env: Rc<RefCell<Env>>) -> Result<Option<DataType>, SchemeError> {
     match prepare_arguments(arguments, env.clone()) {
         Ok(args) => {
             f.call(args, env.clone()).and_then(|r| {
@@ -624,7 +671,7 @@ pub fn setup() -> HashMap<String, DataType> {
         debug!("Function - name: {:?} - Args: {:?}", "+", vec);
         let is_numbers = vec.iter().all(|&ref x| if let &DataType::Number(_) = x { true } else { false });
         if !is_numbers {
-            return Err("wrong argument datatype");
+            return Err("wrong argument datatype".into());
         }
 
         let desc = vec.iter().map(|&ref x|
@@ -647,7 +694,7 @@ pub fn setup() -> HashMap<String, DataType> {
         let is_numbers = vec.iter().all(|&ref x| if let &DataType::Number(_) = x { true } else { false });
 
         if !is_numbers {
-            return Err("wrong argument datatype");
+            return Err("wrong argument datatype".into());
         }
 
         let desc = vec.iter().map(|&ref x|
@@ -676,7 +723,7 @@ pub fn setup() -> HashMap<String, DataType> {
             debug!("Function - name: {:?} - Args: {:?}", "*", vec);
             let is_numbers = vec.iter().all(|&ref x| if let &DataType::Number(_) = x { true } else { false });
             if !is_numbers {
-                return Err("wrong argument datatype");
+                return Err("wrong argument datatype".into());
             }
 
             let desc = vec.iter().map(|&ref x|
@@ -700,7 +747,7 @@ pub fn setup() -> HashMap<String, DataType> {
         let is_numbers = vec.iter().all(|&ref x| if let &DataType::Number(_) = x { true } else { false });
 
         if !is_numbers {
-            return Err("wrong argument datatype");
+            return Err("wrong argument datatype".into());
         }
 
         let desc = vec.iter().map(|&ref x|
@@ -741,15 +788,15 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("abs".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "abs", vec);
         if vec.len() != 1 {
-            return Err("abs function requires one argument only");
+            return Err("abs function requires one argument only".into());
         }
         let value_option = vec.first();
         if value_option.is_none() {
-            return Err("abs function unknown argument type");
+            return Err("abs function unknown argument type".into());
         }
         match value_option.unwrap() {
             &DataType::Number(f) => Ok(Some(DataType::Number(f.abs()))),
-            _ => Err("abs function requires an argument of type 'number'")
+            _ => Err("abs function requires an argument of type 'number'".into())
         }
     }))));
 
@@ -771,7 +818,7 @@ pub fn setup() -> HashMap<String, DataType> {
                 Some(&DataType::Proc(ref p)) => Ok(Some(DataType::Proc(p.clone()))),
                 Some(&DataType::Lambda(ref l)) => Ok(Some(DataType::Lambda(l.clone()))),
                 Some(&DataType::Pair(ref p)) => Ok(Some(DataType::Pair((p.0.clone(), p.1.clone())))),
-                None => { return Err("append function unknown argument type"); }
+                None => { return Err("append function unknown argument type".into()); }
             };
         }
 
@@ -848,14 +895,14 @@ pub fn setup() -> HashMap<String, DataType> {
                         }
                     }
                     None => {
-                        return Err("append function requires an argument of type 'list'");
+                        return Err("append function requires an argument of type 'list'".into());
                     }
                 }
 
                 Ok(Some(DataType::List(list.clone())))
             }
-            Some(_) => { return Err("append function wrong type of the first argument"); }
-            None => { return Err("append function unknown argument type"); }
+            Some(_) => { return Err("append function wrong type of the first argument".into()); }
+            None => { return Err("append function unknown argument type".into()); }
         }
     }))));
 
@@ -863,7 +910,7 @@ pub fn setup() -> HashMap<String, DataType> {
         debug!("Function - name: {:?} - Args: {:?}", "apply", vec);
 
         if vec.len() != 2 {
-            return Err("apply function requires two arguments");
+            return Err("apply function requires two arguments".into());
         }
 
         tuplet!((s0,s1) = vec);
@@ -899,10 +946,10 @@ pub fn setup() -> HashMap<String, DataType> {
                     debug!("proc_env: {:?}", proc_env);
                     return eval(Some(p.body.clone()), Rc::new(RefCell::new(proc_env)));
                 }
-                Some(_) | None => Err("apply function unknown first argument type")
+                Some(_) | None => Err("apply function unknown first argument type".into())
             }
         } else {
-            return Err("apply function requires two arguments");
+            return Err("apply function requires two arguments".into());
         }
     }))));
 
@@ -919,11 +966,11 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("car".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "car", vec);
         if vec.len() != 1 {
-            return Err("car function requires one argument only");
+            return Err("car function requires one argument only".into());
         }
         let value_option = vec.first();
         if value_option.is_none() {
-            return Err("car function unknown argument type");
+            return Err("car function unknown argument type".into());
         }
         match value_option.unwrap() {
             &DataType::List(ref vec) => {
@@ -931,40 +978,40 @@ pub fn setup() -> HashMap<String, DataType> {
                 if value.is_some() {
                     Ok(Some(DataType::from(value.unwrap().clone())))
                 } else {
-                    Err("car function requires a non-empty list")
+                    Err("car function requires a non-empty list".into())
                 }
             }
             &DataType::Pair(ref p) => Ok(Some(*(p.0).clone())),
-            _ => Err("car function requires an argument of type 'list' / 'pair'")
+            _ => Err("car function requires an argument of type 'list' / 'pair'".into())
         }
     }))));
 
     map.insert("cdr".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "cdr", vec);
         if vec.len() != 1 {
-            return Err("cdr function requires one argument only");
+            return Err("cdr function requires one argument only".into());
         }
         let value_option = vec.first();
         if value_option.is_none() {
-            return Err("cdr function unknown argument type");
+            return Err("cdr function unknown argument type".into());
         }
         match value_option.unwrap() {
             &DataType::List(ref vec) => {
                 if vec.len() > 0 {
                     Ok(Some(DataType::List((&vec[1..]).to_vec())))
                 } else {
-                    Err("cdr function requires a non-empty list")
+                    Err("cdr function requires a non-empty list".into())
                 }
             },
             &DataType::Pair(ref p) => Ok(Some(*(p.1).clone())),
-            _ => Err("cdr function requires an argument of type 'list'/ 'pair'")
+            _ => Err("cdr function requires an argument of type 'list'/ 'pair'".into())
         }
     }))));
 
     map.insert("cons".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "cons", vec);
         if vec.len() != 2 {
-            return Err("cons function requires two argument only");
+            return Err("cons function requires two argument only".into());
         }
 
         if let (Some(x), Some(y)) = (vec.get(0), vec.get(1)) {
@@ -981,22 +1028,22 @@ pub fn setup() -> HashMap<String, DataType> {
                 }
             }
         } else {
-            return Err("cons function unknown error")
+            return Err("cons function unknown error".into())
         }
     }))));
 
     map.insert("length".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "length", vec);
         if vec.len() != 1 {
-            return Err("length function requires one argument only");
+            return Err("length function requires one argument only".into());
         }
         let value_option = vec.first();
         if value_option.is_none() {
-            return Err("length function unknown argument type");
+            return Err("length function unknown argument type".into());
         }
         match value_option.unwrap() {
             &DataType::List(ref vec) => Ok(Some(DataType::Number(vec.len() as f64))),
-            _ => Err("length function requires an argument of type 'list'")
+            _ => Err("length function requires an argument of type 'list'".into())
         }
     }))));
 
@@ -1008,11 +1055,11 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("list?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "list?", vec);
         if vec.len() != 1 {
-            return Err("list? function requires one argument only");
+            return Err("list? function requires one argument only".into());
         }
         let value_option = vec.first();
         if value_option.is_none() {
-            return Err("list? function unknown argument type");
+            return Err("list? function unknown argument type".into());
         }
         match value_option.unwrap() {
             &DataType::List(_) => Ok(Some(DataType::Bool(true))),
@@ -1023,12 +1070,12 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("map".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, env: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "map", vec);
         if vec.len() != 2 {
-            return Err("map function requires two argument only");
+            return Err("map function requires two argument only".into());
         }
 
         let value_option = vec.first();
         if value_option.is_none() {
-            return Err("map function unknown argument type");
+            return Err("map function unknown argument type".into());
         }
 
         if let (Some(d), Some(&DataType::List(ref l))) = (vec.first(), vec.get(1)) {
@@ -1072,7 +1119,7 @@ pub fn setup() -> HashMap<String, DataType> {
                 _ => unreachable!()
             }
         } else {
-            Err("syntax error")
+            Err("syntax error".into())
         }
     }))));
 
@@ -1080,7 +1127,7 @@ pub fn setup() -> HashMap<String, DataType> {
         debug!("Function - name: {:?} - Args: {:?}", "max", vec);
         let is_numbers = vec.iter().all(|&ref x| if let &DataType::Number(_) = x { true } else { false });
         if !is_numbers {
-            return Err("wrong argument datatype");
+            return Err("wrong argument datatype".into());
         }
         let numbers = vec.iter().filter_map(|&ref x| { if let &DataType::Number(ref y) = x { Some(y.clone()) } else { None } });
         let data = numbers.map(|x| {
@@ -1094,7 +1141,7 @@ pub fn setup() -> HashMap<String, DataType> {
         debug!("Function - name: {:?} - Args: {:?}", "min", vec);
         let is_numbers = vec.iter().all(|&ref x| if let &DataType::Number(_) = x { true } else { false });
         if !is_numbers {
-            return Err("wrong argument datatype");
+            return Err("wrong argument datatype".into());
         }
         let numbers = vec.iter().filter_map(|&ref x| { if let &DataType::Number(ref y) = x { Some(y.clone()) } else { None } });
 
@@ -1108,26 +1155,26 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("not".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "not", vec);
         if vec.len() != 1 {
-            return Err("not function requires one argument only");
+            return Err("not function requires one argument only".into());
         }
         let value_option = vec.first();
         if value_option.is_none() {
-            return Err("not function unknown argument type");
+            return Err("not function unknown argument type".into());
         }
         match value_option.unwrap() {
             &DataType::Bool(b) => Ok(Some(DataType::Bool(!b))),
-            _ => Err("not function requires an argument of type 'boolean'")
+            _ => Err("not function requires an argument of type 'boolean'".into())
         }
     }))));
 
     map.insert("number?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "number?", vec);
         if vec.len() != 1 {
-            return Err("number? function requires one argument only");
+            return Err("number? function requires one argument only".into());
         }
         let value_option = vec.first();
         if value_option.is_none() {
-            return Err("number? function unknown argument type");
+            return Err("number? function unknown argument type".into());
         }
         match value_option.unwrap() {
             &DataType::Number(_) => Ok(Some(DataType::Bool(true))),
@@ -1137,11 +1184,11 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("pair?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "pair?", vec);
         if vec.len() != 1 {
-            return Err("pair? function requires one argument only");
+            return Err("pair? function requires one argument only".into());
         }
         let value_option = vec.first();
         if value_option.is_none() {
-            return Err("pair? function unknown argument type");
+            return Err("pair? function unknown argument type".into());
         }
         match value_option.unwrap() {
             &DataType::Pair(_) => Ok(Some(DataType::Bool(true))),
@@ -1153,12 +1200,12 @@ pub fn setup() -> HashMap<String, DataType> {
         Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
             debug!("Function - name: {:?} - Args: {:?}", "print", vec);
             if vec.len() != 1 {
-                return Err("print function requires one argument only");
+                return Err("print function requires one argument only".into());
             }
 
             let value_option = vec.first();
             if value_option.is_none() {
-                return Err("unknown argument type");
+                return Err("unknown argument type".into());
             }
             println!("{}", datatype2str(value_option.unwrap()));
             //        print_fn(value_option.unwrap());
@@ -1168,11 +1215,11 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("procedure?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "procedure?", vec);
         if vec.len() != 1 {
-            return Err("procedure? function requires one argument only");
+            return Err("procedure? function requires one argument only".into());
         }
         let value_option = vec.first();
         if value_option.is_none() {
-            return Err("procedure? function unknown argument type");
+            return Err("procedure? function unknown argument type".into());
         }
         match value_option.unwrap() {
             &DataType::Proc(_) => Ok(Some(DataType::Bool(true))),
@@ -1184,11 +1231,11 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("string?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "string?", vec);
         if vec.len() != 1 {
-            return Err("string? function requires one argument only");
+            return Err("string? function requires one argument only".into());
         }
         let value_option = vec.first();
         if value_option.is_none() {
-            return Err("string? function unknown argument type");
+            return Err("string? function unknown argument type".into());
         }
         match value_option.unwrap() {
             &DataType::String(_) => Ok(Some(DataType::Bool(true))),
@@ -1199,11 +1246,11 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("symbol?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "symbol?", vec);
         if vec.len() != 1 {
-            return Err("symbol? function requires one argument only");
+            return Err("symbol? function requires one argument only".into());
         }
         let value_option = vec.first();
         if value_option.is_none() {
-            return Err("symbol? function unknown argument type");
+            return Err("symbol? function unknown argument type".into());
         }
         match value_option.unwrap() {
             &DataType::Symbol(_) => Ok(Some(DataType::Bool(true))),
@@ -1246,11 +1293,11 @@ fn datatype2str(value: &DataType) -> String {
     }
 }
 
-fn ast2datatype(value: &AST) -> Result<DataType, &'static str> {
+fn ast2datatype(value: &AST) -> Result<DataType, SchemeError> {
     match value {
         &AST::Children(ref v) => {
             let children_result: Result<Vec<_>, _> = v.iter().map(|ast| ast2datatype(&ast)).collect();
-            if let Result::Err(ref e) = children_result { return Err(e); }
+            if let Result::Err(ref e) = children_result { return Err(e.clone()); }
 
             let children = children_result.unwrap().into_iter().collect::<Vec<DataType>>();
             Ok(DataType::List(children))
@@ -1258,7 +1305,7 @@ fn ast2datatype(value: &AST) -> Result<DataType, &'static str> {
         &AST::Symbol(ref s) => {
             if s.starts_with("#") {
                 if s.len() != 2 {
-                    return Err("syntax error");
+                    return Err("syntax error".into());
                 }
                 let c_option = s.chars().nth(1);
                 if let Some('t') = c_option {
@@ -1266,7 +1313,7 @@ fn ast2datatype(value: &AST) -> Result<DataType, &'static str> {
                 } else if let Some('f') = c_option {
                     Ok(DataType::Bool(false))
                 } else {
-                    Err("syntax error")
+                    Err("syntax error".into())
                 }
             } else if s.starts_with("\"") && s.ends_with("\"") {
                 Ok(DataType::Symbol((&s[1..s.len() - 1]).to_string()))

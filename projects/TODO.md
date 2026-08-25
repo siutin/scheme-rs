@@ -17,11 +17,11 @@
   - Files: `Cargo.toml`, `src/lib.rs`, `src/main.rs`, `src/cli.rs`, `src/bench.rs`
   - Status: `[x]` done
 
-- [ ] **Task 2: Create `SchemeError` enum, replace `&'static str`**
+- [x] **Task 2: Create `SchemeError` enum, replace `&'static str`**
   - Acceptance: All `Result<_, &'static str>` become `Result<_, SchemeError>`. `SchemeError` implements `Display` + `std::error::Error`. Variants: `SyntaxError`, `TypeError`, `UndefinedSymbol`, `ArityError`, `DivisionByZero`, `RuntimeError`.
   - Verify: `cargo build` succeeds, `cargo test` passes (30/30), error messages are still readable in REPL
   - Files: `src/lib.rs` (new enum + all signature changes)
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 - [ ] **Task 3: Remove `tuplet!` macro, use direct slice access**
   - Acceptance: No `tuplet!` macro definition or invocation in codebase. All destructuring uses `vec.get(N)` or pattern matching. Zero "unused variable" warnings.

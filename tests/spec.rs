@@ -125,7 +125,7 @@ fn tricky_test1 () {
 fn state_test() {
     let env_ref = default_env();
     let test_result0 = run_with_env("s", env_ref.clone());
-    assert_eq!(Err("symbol is not defined."), test_result0.value);
+    assert_eq!(Err("symbol is not defined.".into()), test_result0.value);
 
     let test_result1 = run_with_env("(define s \"hello world\")", env_ref.clone());
     assert_eq!(Ok(None), test_result1.value);
@@ -137,12 +137,12 @@ fn state_test() {
 #[test]
 fn type_test() {
     assert_eq!(Ok(Some(DataType::String("hello world".into()))), run("\"hello world\"").value);
-    assert_eq!(Err("can not find an end quote"), run("\"hello world").value);
+    assert_eq!(Err("can not find an end quote".into()), run("\"hello world").value);
     assert_eq!(Ok(Some(DataType::Number(1.0))), run("1").value);
     assert_eq!(Ok(Some(DataType::Number(3.9))), run("3.9").value);
     assert_eq!(Ok(Some(DataType::Symbol("foo".into()))), run("'foo").value);
     assert_eq!(Ok(Some(DataType::Bool(true))), run("#t").value);
-    assert_eq!(Err("syntax error"), run("#tt").value);
+    assert_eq!(Err("syntax error".into()), run("#tt").value);
     assert_eq!(Ok(Some(DataType::Pair(
         (
             Box::new(DataType::Number(1.0)),
@@ -216,7 +216,7 @@ mod std_function {
                 Box::new(DataType::Number(2.0))
             )
         ))), run("(cons 1 2)").value);
-        assert_eq!(Err("cons function requires two argument only"), run("(cons 'a)").value);
+        assert_eq!(Err("cons function requires two argument only".into()), run("(cons 'a)").value);
 
     }
 
@@ -407,7 +407,7 @@ mod std_function {
         }
         {
             let test_result = run("(not 1)");
-            assert_eq!(Err("not function requires an argument of type 'boolean'"), test_result.value);
+            assert_eq!(Err("not function requires an argument of type 'boolean'".into()), test_result.value);
         }
     }
 
@@ -640,7 +640,7 @@ fn init() {
 
 #[derive(Debug)]
 struct TestResult {
-    value: Result<Option<DataType>, &'static str>,
+    value: Result<Option<DataType>, SchemeError>,
     env: Rc<RefCell<Env>>
 }
 
