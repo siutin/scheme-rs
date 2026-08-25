@@ -155,10 +155,80 @@
 
 ---
 
+## Phase 5: R5RS Features (`r5rs`)
+
+> **Spec**: `projects/SPEC_R5RS.md`
+
+### Special Forms (eval.rs)
+
+- [ ] **Task 18: `let` — local bindings**
+  - Acceptance: `(let ((x 1) (y 2)) (+ x y))` returns `3`. Bindings are scoped to the body only.
+  - Verify: New test `let_test` passes, all 38 existing tests pass
+  - Files: `src/eval.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 19: `cond` — multi-branch conditional**
+  - Acceptance: `(cond ((= 1 2) 'a) ((= 1 1) 'b) (else 'c))` returns `'b`. `else` clause works.
+  - Verify: New test `cond_test` passes, all existing tests pass
+  - Files: `src/eval.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 20: `set!` — mutate existing binding**
+  - Acceptance: `(define x 1) (set! x 5) x` returns `5`. Setting a variable in the current scope mutates it in place.
+  - Verify: New test `set_test` passes, all existing tests pass
+  - Files: `src/eval.rs`, `src/env.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 21: `when` / `unless`**
+  - Acceptance: `(when #t 1)` returns `1`, `(when #f 1)` returns unspecified, `(unless #t 1)` returns unspecified, `(unless #f 1)` returns `1`
+  - Verify: New test `when_unless_test` passes, all existing tests pass
+  - Files: `src/eval.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 22: `case` — key dispatch**
+  - Acceptance: `(case 2 ((1) 'one) ((2) 'two) (else 'other))` returns `'two`
+  - Verify: New test `case_test` passes, all existing tests pass
+  - Files: `src/eval.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+### Builtins (builtins.rs)
+
+- [ ] **Task 23: `eq?` / `eqv?` / `equal?`**
+  - Acceptance: `(eq? 'a 'a)` → `#t`, `(eqv? 1 1)` → `#t`, `(equal? (list 1 2) (list 1 2))` → `#t`
+  - Verify: New test `equality_predicates_test` passes, all existing tests pass
+  - Files: `src/builtins.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 24: `display` / `newline`**
+  - Acceptance: `(display "hello")` prints `hello` (no quotes), `(newline)` prints a newline
+  - Verify: New test `display_newline_test` passes, all existing tests pass
+  - Files: `src/builtins.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 25: String operations**
+  - Acceptance: `(string-length "abc")` → `3`, `(string-append "a" "b")` → `"ab"`, `(string->symbol "x")` → `'x`, `(symbol->string 'x)` → `"x"`
+  - Verify: New test `string_operations_test` passes, all existing tests pass
+  - Files: `src/builtins.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 26: Type/number predicates + integer division**
+  - Acceptance: `(boolean? #t)` → `#t`, `(zero? 0)` → `#t`, `(positive? 1)` → `#t`, `(negative? -1)` → `#t`, `(modulo 7 3)` → `1`, `(quotient 7 3)` → `2`, `(remainder 7 3)` → `1`, `(even? 4)` → `#t`, `(odd? 3)` → `#t`
+  - Verify: New test `predicates_and_int_div_test` passes, all existing tests pass
+  - Files: `src/builtins.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+### Checkpoint: R5RS Features
+- [ ] `let`, `cond`, `set!`, `when`/`unless`, `case` all work
+- [ ] `eq?`/`eqv?`/`equal?`, `display`/`newline`, string ops, predicates, integer division all work
+- [ ] All 38+ tests pass (new tests added for each feature)
+- [ ] Zero compiler warnings
+
+---
+
 ## Known Issues (Deferred — Not in This Round)
 
 - [ ] **No tail-call optimization**: Deep recursion overflows the stack (~10k frames). Fix requires a trampoline or explicit loop in `eval` for tail positions.
 - [ ] **Integer precision loss**: All numbers are `f64`. `i64` is cast to `f64` at eval time. Fix requires a numeric tower (BigInt or at least i64/f64 distinction).
-- [ ] **Missing R5RS features**: `let`, `cond`, `case`, `set!`, `when`/`unless`, `quasiquote`/`unquote`, `eq?`/`eqv?`/`equal?`, `string-*` operations, `display`/`newline`, `do` loops, named `let`, macros.
 - [ ] **Travis CI is dead**: No working CI. Should migrate to GitHub Actions.
 - [ ] **5 unpushed commits on master**: Should push before merging this branch back.
+- [ ] **Advanced R5RS features deferred**: `quasiquote`/`unquote`, `do` loops, named `let`, macros (`define-syntax`/`syntax-rules`), `call/cc`.
