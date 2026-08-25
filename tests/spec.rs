@@ -238,6 +238,19 @@ fn let_test() {
 }
 
 #[test]
+fn cond_test() {
+    // Basic cond with else
+    let test_result = run("(cond ((= 1 2) 10) ((= 1 1) 20) (else 30))");
+    assert_eq!(Ok(Some(DataType::Number(20.0))), test_result.value);
+    // cond falls through to else
+    let test_result2 = run("(cond ((= 1 2) 10) ((= 1 3) 20) (else 30))");
+    assert_eq!(Ok(Some(DataType::Number(30.0))), test_result2.value);
+    // cond with no match and no else returns #f
+    let test_result3 = run("(cond ((= 1 2) 10) ((= 1 3) 20))");
+    assert_eq!(Ok(Some(DataType::Bool(false))), test_result3.value);
+}
+
+#[test]
 fn tricky_test1 () {
 
     // Testing the case that the 1st element is a children and it returns a function/lambda after an evaluation

@@ -167,11 +167,11 @@
   - Files: `src/eval.rs`, `tests/spec.rs`
   - Status: `[x]` done
 
-- [ ] **Task 19: `cond` — multi-branch conditional**
+- [x] **Task 19: `cond` — multi-branch conditional**
   - Acceptance: `(cond ((= 1 2) 'a) ((= 1 1) 'b) (else 'c))` returns `'b`. `else` clause works.
-  - Verify: New test `cond_test` passes, all existing tests pass
+  - Verify: New test `cond_test` passes, all 40 tests pass
   - Files: `src/eval.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 - [ ] **Task 20: `set!` — mutate existing binding**
   - Acceptance: `(define x 1) (set! x 5) x` returns `5`. Setting a variable in the current scope mutates it in place.

@@ -215,6 +215,41 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                             Err("let requires bindings and a body".into())
                         }
                     }
+                    "cond" => {
+                        // (cond (test expr...) ... (else expr...))
+                        let mut result = Ok(Some(DataType::Bool(false)));
+                        for i in 1..list.len() {
+                            if let Some(&AST::Children(ref clause)) = list.get(i) {
+                                let test = clause.get(0);
+                                let body = clause.get(1);
+                                // Check for else clause
+                                let is_else = match test {
+                                    Some(&AST::Symbol(ref s)) if s == "else" => true,
+                                    _ => false,
+                                };
+                                if is_else {
+                                    if let Some(body_ast) = body {
+                                        result = eval(Some(body_ast.clone()), env.clone());
+                                    }
+                                    break;
+                                }
+                                if let Some(test_ast) = test {
+                                    match eval(Some(test_ast.clone()), env.clone()) {
+                                        Ok(Some(DataType::Bool(true))) => {
+                                            if let Some(body_ast) = body {
+                                                result = eval(Some(body_ast.clone()), env.clone());
+                                            }
+                                            break;
+                                        }
+                                        Ok(Some(DataType::Bool(false))) | Ok(None) => continue,
+                                        Ok(_) => continue,
+                                        Err(e) => return Err(e),
+                                    }
+                                }
+                            }
+                        }
+                        result
+                    }
                     _ => {
                         debug!("Some(AST::Symbol) but not define");
                         debug!("proc_key : {}", s0);
