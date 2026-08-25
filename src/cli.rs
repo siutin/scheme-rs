@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::io;
 use std::io::Write;
 use log::debug;
@@ -7,18 +5,14 @@ use scheme_rs::*;
 
 fn main() {
     env_logger::init();
-    let local = Box::new(RefCell::new(setup()));
-    let env = Env {
-        local,
-        parent: None
-    };
+    let env = Env::root(setup());
     debug!("Env: {:?}", env);
 
     println!("Welcome to scheme-rs");
-    repl(Rc::new(RefCell::new(env)));
+    repl(env);
 }
 
-fn repl(env: Rc<RefCell<Env>>) {
+fn repl(env: EnvRef) {
     loop {
         print!("scheme=> ");
         io::stdout().flush().expect("cannot flush screen");

@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use scheme_rs::*;
 
 #[test]
@@ -1172,25 +1170,18 @@ fn init() {
 #[derive(Debug)]
 struct TestResult {
     value: Result<Option<DataType>, SchemeError>,
-    env: Rc<RefCell<Env>>
+    env: EnvRef
 }
 
-fn default_env() -> Rc<RefCell<Env>> {
-    let local = Box::new(RefCell::new(setup()));
-    let env = Env {
-        local,
-        parent: None
-    };
-
-    let env_ref = Rc::new(RefCell::new(env));
-    env_ref
+fn default_env() -> EnvRef {
+    Env::root(setup())
 }
 
 fn run(s: &str) -> TestResult {
     run_with_env(s, default_env().clone())
 }
 
-fn run_with_env(s: &str, env_ref: Rc<RefCell<Env>>) -> TestResult {
+fn run_with_env(s: &str, env_ref: EnvRef) -> TestResult {
     let result = parse(s)
         .and_then(|ast| eval(Some(ast.result), env_ref.clone()));
 

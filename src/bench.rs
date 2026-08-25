@@ -6,17 +6,13 @@ extern crate test;
 #[cfg(all(feature = "unstable", test))]
 mod bench {
     use test::Bencher;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    use scheme_rs::{eval, parse, setup, Env};
+    use scheme_rs::{eval, parse, setup, Env, EnvRef};
 
-    fn default_env() -> Rc<RefCell<Env>> {
-        let local = Box::new(RefCell::new(setup()));
-        let env = Env { local, parent: None };
-        Rc::new(RefCell::new(env))
+    fn default_env() -> EnvRef {
+        Env::root(setup())
     }
 
-    fn run(s: &str, env: Rc<RefCell<Env>>) {
+    fn run(s: &str, env: EnvRef) {
         parse(s).and_then(|ast| eval(Some(ast.result), env)).unwrap();
     }
 

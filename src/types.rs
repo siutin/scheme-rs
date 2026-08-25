@@ -1,10 +1,9 @@
-use std::cell::RefCell;
 use std::rc::Rc;
 use std::fmt;
 use std::f64;
 
 use crate::SchemeError;
-use crate::env::Env;
+use crate::env::EnvRef;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AST {
@@ -22,11 +21,10 @@ pub struct ReadFromTokenResult {
 }
 
 #[derive(Clone)]
-#[derive(PartialEq)]
 pub struct Procedure {
     pub body: Rc<AST>,
     pub params: Vec<DataType>,
-    pub env: Rc<RefCell<Env>>
+    pub env: EnvRef
 }
 
 impl fmt::Debug for Procedure {
@@ -41,10 +39,18 @@ impl fmt::Debug for Procedure {
     }
 }
 
-pub struct Function(pub Rc<dyn Fn(Vec<DataType>, Rc<RefCell<Env>>) -> Result<Option<DataType>, SchemeError>>);
+impl PartialEq for Procedure {
+    fn eq(&self, other: &Procedure) -> bool {
+        self.body == other.body
+            && self.params == other.params
+            && Rc::ptr_eq(&self.env, &other.env)
+    }
+}
+
+pub struct Function(pub Rc<dyn Fn(Vec<DataType>, EnvRef) -> Result<Option<DataType>, SchemeError>>);
 
 impl Function {
-    pub fn call(&self, arguments: Vec<DataType>, env: Rc<RefCell<Env>>) -> Result<Option<DataType>, SchemeError> {
+    pub fn call(&self, arguments: Vec<DataType>, env: EnvRef) -> Result<Option<DataType>, SchemeError> {
         (self.0)(arguments, env)
     }
 }

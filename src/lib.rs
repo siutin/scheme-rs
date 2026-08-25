@@ -2,7 +2,7 @@ mod error;
 pub use error::SchemeError;
 
 mod env;
-pub use env::Env;
+pub use env::{Env, Environment, EnvRef};
 
 mod types;
 pub use types::{AST, ReadFromTokenResult, Procedure, Function, DataType, FloatIterExt};

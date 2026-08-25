@@ -5,14 +5,14 @@ use std::rc::Rc;
 use log::debug;
 
 use crate::types::{Function, DataType, FloatIterExt};
-use crate::env::Env;
+use crate::env::{Env, EnvRef, Environment};
 use crate::eval::{eval, datatype2str};
 use crate::SchemeError;
 
 #[macro_export]
 macro_rules! define_comparison {
     ($proc:ident, $name:pat, $func:expr) => {
-        let $proc = DataType::Proc(Function( Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        let $proc = DataType::Proc(Function( Rc::new(|vec: Vec<DataType>, _: EnvRef| {
                 debug!("Function - name: {:?} - Args: {:?}", stringify!($name), vec);
                 if vec.len() != 2 {
                     return Err("function requires 2 arguments only".into());
@@ -40,7 +40,7 @@ pub fn setup() -> HashMap<String, DataType> {
     let mut map = HashMap::new();
     map.insert("pi".to_string(), DataType::Float(std::f64::consts::PI));
 
-    map.insert("+".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("+".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "+", vec);
         if !vec.iter().all(|x| x.is_number()) {
             return Err("wrong argument datatype".into());
@@ -56,7 +56,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("-".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("-".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "-", vec);
         if !vec.iter().all(|x| x.is_number()) {
             return Err("wrong argument datatype".into());
@@ -77,7 +77,7 @@ pub fn setup() -> HashMap<String, DataType> {
     }))));
 
     map.insert("*".to_string(), DataType::Proc(
-        Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
             debug!("Function - name: {:?} - Args: {:?}", "*", vec);
             if !vec.iter().all(|x| x.is_number()) {
                 return Err("wrong argument datatype".into());
@@ -92,7 +92,7 @@ pub fn setup() -> HashMap<String, DataType> {
             }
         }))));
 
-    map.insert("/".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("/".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "/", vec);
         if !vec.iter().all(|x| x.is_number()) {
             return Err("wrong argument datatype".into());
@@ -132,7 +132,7 @@ pub fn setup() -> HashMap<String, DataType> {
     define_comparison!(le, "<=", |a,b| { a <= b });
     map.insert("<=".to_string(), le);
 
-    map.insert("abs".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("abs".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "abs", vec);
         if vec.len() != 1 {
             return Err("abs function requires one argument only".into());
@@ -148,7 +148,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("append".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("append".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "append", vec);
 
         if vec.is_empty() {
@@ -264,7 +264,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("apply".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, env: Rc<RefCell<Env>>| {
+    map.insert("apply".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, env: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "apply", vec);
 
         if vec.len() != 2 {
@@ -286,24 +286,19 @@ pub fn setup() -> HashMap<String, DataType> {
                 Some(&DataType::Lambda(ref p)) => {
                     debug!("first elm symbol - lambda: {:?}", p);
                     debug!("first elm symbol - procedure params: {:?}", p.params);
-                    let procedure_local = Box::new(RefCell::new(HashMap::new()));
+                    let proc_env = Env::new(HashMap::new(), Some(p.env.clone()));
 
                     for (name_ref, value_ref) in p.params.iter().zip(args.into_iter()) {
                         debug!("first elm symbol - procedure params - name: {:?} value: {:?}", name_ref, value_ref);
                         if let (Some(&DataType::Symbol(ref name)), Some(value)) = (Some(name_ref), Some(value_ref)) {
-                            procedure_local.borrow_mut().insert(name.to_string(), value.clone());
+                            proc_env.define(name.to_string(), value.clone());
                         } else {
                             return Err(SchemeError::RuntimeError("internal error: unexpected state".into()))
                         }
                     }
 
-                    let proc_env = Env {
-                        local: procedure_local,
-                        parent: Some(Box::new(p.env.clone()))
-                    };
-
                     debug!("proc_env: {:?}", proc_env);
-                    return eval(Some((*p.body).clone()), Rc::new(RefCell::new(proc_env)));
+                    return eval(Some((*p.body).clone()), Rc::new(RefCell::new(proc_env)) as EnvRef);
                 }
                 Some(_) | None => Err("apply function unknown first argument type".into())
             }
@@ -315,14 +310,14 @@ pub fn setup() -> HashMap<String, DataType> {
     // pre-defined commands
     map.insert("begin".to_string(), DataType::Proc(
         Function(
-            Rc::new(|mut vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+            Rc::new(|mut vec: Vec<DataType>, _: EnvRef| {
                 debug!("Function - name: {:?} - Args: {:?}", "begin", vec);
                 Ok(vec.pop().clone())
             })
         )
     ));
 
-    map.insert("car".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("car".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "car", vec);
         if vec.len() != 1 {
             return Err("car function requires one argument only".into());
@@ -345,7 +340,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("cdr".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("cdr".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "cdr", vec);
         if vec.len() != 1 {
             return Err("cdr function requires one argument only".into());
@@ -367,7 +362,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("cons".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("cons".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "cons", vec);
         if vec.len() != 2 {
             return Err("cons function requires two argument only".into());
@@ -391,7 +386,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("length".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("length".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "length", vec);
         if vec.len() != 1 {
             return Err("length function requires one argument only".into());
@@ -406,12 +401,12 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("list".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("list".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "list", vec);
         Ok(Some(DataType::List(vec)))
     }))));
 
-    map.insert("list?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("list?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "list?", vec);
         if vec.len() != 1 {
             return Err("list? function requires one argument only".into());
@@ -426,7 +421,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("null?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("null?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("null? requires 1 argument".into()); }
         match vec.get(0) {
             Some(&DataType::List(ref v)) if v.is_empty() => Ok(Some(DataType::Bool(true))),
@@ -434,7 +429,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("map".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, env: Rc<RefCell<Env>>| {
+    map.insert("map".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, env: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "map", vec);
         if vec.len() != 2 {
             return Err("map function requires two argument only".into());
@@ -459,23 +454,18 @@ pub fn setup() -> HashMap<String, DataType> {
                 },
                 &DataType::Lambda(ref p) => {
                     let list = l.iter().map(|item| {
-                        let procedure_local = Box::new(RefCell::new(HashMap::new()));
+                        let proc_env = Env::new(HashMap::new(), Some(p.env.clone()));
                         let args = vec![item.clone()];
                         for (name_ref, value_ref) in p.params.iter().zip(args.into_iter()) {
                             if let (Some(&DataType::Symbol(ref name)), Some(ref value)) = (Some(name_ref), Some(value_ref)) {
-                                procedure_local.borrow_mut().insert(name.to_string(), value.clone());
+                                proc_env.define(name.to_string(), value.clone());
                             } else {
                                 return Err(SchemeError::RuntimeError("internal error: unexpected state".into()))
                             }
                         }
 
-                        let proc_env = Env {
-                            local: procedure_local,
-                            parent: Some(Box::new(p.env.clone()))
-                        };
-
                         debug!("proc_env: {:?}", proc_env);
-                        eval(Some((*p.body).clone()), Rc::new(RefCell::new(proc_env)))
+                        eval(Some((*p.body).clone()), Rc::new(RefCell::new(proc_env)) as EnvRef)
                     }).flat_map(|x| x.ok())
                         .filter(|x| x.is_some())
                         .flat_map(|x| x)
@@ -490,7 +480,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("max".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("max".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "max", vec);
         if !vec.iter().all(|x| x.is_number()) {
             return Err("wrong argument datatype".into());
@@ -505,7 +495,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("min".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("min".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "min", vec);
         if !vec.iter().all(|x| x.is_number()) {
             return Err("wrong argument datatype".into());
@@ -520,7 +510,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("not".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("not".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "not", vec);
         if vec.len() != 1 {
             return Err("not function requires one argument only".into());
@@ -535,7 +525,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("number?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("number?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "number?", vec);
         if vec.len() != 1 {
             return Err("number? function requires one argument only".into());
@@ -550,7 +540,7 @@ pub fn setup() -> HashMap<String, DataType> {
             _ => Ok(Some(DataType::Bool(false)))
         }
     }))));
-    map.insert("pair?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("pair?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "pair?", vec);
         if vec.len() != 1 {
             return Err("pair? function requires one argument only".into());
@@ -566,7 +556,7 @@ pub fn setup() -> HashMap<String, DataType> {
     }))));
 
     map.insert("print".to_string(), DataType::Proc(
-        Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
             debug!("Function - name: {:?} - Args: {:?}", "print", vec);
             if vec.len() != 1 {
                 return Err("print function requires one argument only".into());
@@ -581,7 +571,7 @@ pub fn setup() -> HashMap<String, DataType> {
             Ok(None)
         }))));
 
-    map.insert("procedure?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("procedure?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "procedure?", vec);
         if vec.len() != 1 {
             return Err("procedure? function requires one argument only".into());
@@ -597,7 +587,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("string?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("string?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "string?", vec);
         if vec.len() != 1 {
             return Err("string? function requires one argument only".into());
@@ -612,7 +602,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("symbol?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("symbol?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         debug!("Function - name: {:?} - Args: {:?}", "symbol?", vec);
         if vec.len() != 1 {
             return Err("symbol? function requires one argument only".into());
@@ -648,7 +638,7 @@ pub fn setup() -> HashMap<String, DataType> {
     // --- R5RS equality predicates ---
 
     // eq? — identity comparison (same symbol, same number, same bool)
-    map.insert("eq?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("eq?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 2 { return Err("eq? requires 2 arguments".into()); }
         let a = vec.get(0).unwrap();
         let b = vec.get(1).unwrap();
@@ -656,7 +646,7 @@ pub fn setup() -> HashMap<String, DataType> {
     }))));
 
     // eqv? — type-sensitive equality (Integer(1) != Float(1.0))
-    map.insert("eqv?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("eqv?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 2 { return Err("eqv? requires 2 arguments".into()); }
         let a = vec.get(0).unwrap();
         let b = vec.get(1).unwrap();
@@ -673,7 +663,7 @@ pub fn setup() -> HashMap<String, DataType> {
     }))));
 
     // equal? — deep equality (lists compared element-wise)
-    map.insert("equal?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("equal?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 2 { return Err("equal? requires 2 arguments".into()); }
         let a = vec.get(0).unwrap();
         let b = vec.get(1).unwrap();
@@ -683,7 +673,7 @@ pub fn setup() -> HashMap<String, DataType> {
     // --- R5RS output ---
 
     // display — print without quotes (strings show raw, symbols show without ')
-    map.insert("display".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("display".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("display requires 1 argument".into()); }
         let val = vec.get(0).unwrap();
         let s = match val {
@@ -697,7 +687,7 @@ pub fn setup() -> HashMap<String, DataType> {
     }))));
 
     // newline — print a newline
-    map.insert("newline".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("newline".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if !vec.is_empty() { return Err("newline takes no arguments".into()); }
         println!();
         Ok(None)
@@ -705,7 +695,7 @@ pub fn setup() -> HashMap<String, DataType> {
 
     // --- R5RS string operations ---
 
-    map.insert("string-length".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("string-length".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("string-length requires 1 argument".into()); }
         match vec.get(0) {
             Some(&DataType::String(ref s)) => Ok(Some(DataType::Integer(s.len() as i64))),
@@ -713,7 +703,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("string-append".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("string-append".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         let mut result = String::new();
         for arg in &vec {
             match arg {
@@ -724,7 +714,7 @@ pub fn setup() -> HashMap<String, DataType> {
         Ok(Some(DataType::String(result)))
     }))));
 
-    map.insert("string->symbol".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("string->symbol".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("string->symbol requires 1 argument".into()); }
         match vec.get(0) {
             Some(&DataType::String(ref s)) => Ok(Some(DataType::Symbol(s.clone()))),
@@ -732,7 +722,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("symbol->string".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("symbol->string".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("symbol->string requires 1 argument".into()); }
         match vec.get(0) {
             Some(&DataType::Symbol(ref s)) => Ok(Some(DataType::String(s.clone()))),
@@ -742,7 +732,7 @@ pub fn setup() -> HashMap<String, DataType> {
 
     // --- R5RS type/number predicates ---
 
-    map.insert("boolean?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("boolean?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("boolean? requires 1 argument".into()); }
         match vec.get(0) {
             Some(&DataType::Bool(_)) => Ok(Some(DataType::Bool(true))),
@@ -750,7 +740,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("zero?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("zero?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("zero? requires 1 argument".into()); }
         match vec.get(0) {
             Some(x) if x.is_number() => Ok(Some(DataType::Bool(x.as_f64().unwrap() == 0.0))),
@@ -758,7 +748,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("positive?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("positive?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("positive? requires 1 argument".into()); }
         match vec.get(0) {
             Some(x) if x.is_number() => Ok(Some(DataType::Bool(x.as_f64().unwrap() > 0.0))),
@@ -766,7 +756,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("negative?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("negative?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("negative? requires 1 argument".into()); }
         match vec.get(0) {
             Some(x) if x.is_number() => Ok(Some(DataType::Bool(x.as_f64().unwrap() < 0.0))),
@@ -774,7 +764,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("even?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("even?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("even? requires 1 argument".into()); }
         match vec.get(0) {
             Some(x) if x.is_number() => Ok(Some(DataType::Bool(x.as_f64().unwrap() as i64 % 2 == 0))),
@@ -782,7 +772,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("odd?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("odd?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("odd? requires 1 argument".into()); }
         match vec.get(0) {
             Some(x) if x.is_number() => Ok(Some(DataType::Bool(x.as_f64().unwrap() as i64 % 2 != 0))),
@@ -792,7 +782,7 @@ pub fn setup() -> HashMap<String, DataType> {
 
     // --- R5RS integer division ---
 
-    map.insert("modulo".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("modulo".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 2 { return Err("modulo requires 2 arguments".into()); }
         if let (Some(a), Some(b)) = (vec.get(0), vec.get(1)) {
             if !a.is_number() || !b.is_number() { return Err("modulo requires numbers".into()); }
@@ -805,7 +795,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("quotient".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("quotient".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 2 { return Err("quotient requires 2 arguments".into()); }
         if let (Some(a), Some(b)) = (vec.get(0), vec.get(1)) {
             if !a.is_number() || !b.is_number() { return Err("quotient requires numbers".into()); }
@@ -818,7 +808,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("remainder".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("remainder".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 2 { return Err("remainder requires 2 arguments".into()); }
         if let (Some(a), Some(b)) = (vec.get(0), vec.get(1)) {
             if !a.is_number() || !b.is_number() { return Err("remainder requires numbers".into()); }
@@ -833,7 +823,7 @@ pub fn setup() -> HashMap<String, DataType> {
 
     // --- List utilities ---
 
-    map.insert("reverse".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("reverse".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("reverse requires 1 argument".into()); }
         if let Some(DataType::List(ref l)) = vec.get(0) {
             Ok(Some(DataType::List(l.iter().rev().cloned().collect())))
@@ -842,7 +832,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("list-ref".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("list-ref".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 2 { return Err("list-ref requires 2 arguments".into()); }
         if let (Some(DataType::List(ref l)), Some(idx)) = (vec.get(0), vec.get(1)) {
             let i = idx.as_f64().unwrap() as usize;
@@ -856,7 +846,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("list-tail".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("list-tail".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 2 { return Err("list-tail requires 2 arguments".into()); }
         if let (Some(DataType::List(ref l)), Some(idx)) = (vec.get(0), vec.get(1)) {
             let i = idx.as_f64().unwrap() as usize;
@@ -873,7 +863,7 @@ pub fn setup() -> HashMap<String, DataType> {
     // member / memq / memv — find element in list, return tail from match
     let make_member = |cmp: fn(&DataType, &DataType) -> bool, name: &str| -> DataType {
         let name = name.to_string();
-        DataType::Proc(Function(Rc::new(move |vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        DataType::Proc(Function(Rc::new(move |vec: Vec<DataType>, _: EnvRef| {
             if vec.len() != 2 { return Err(SchemeError::RuntimeError(format!("{} requires 2 arguments", name))); }
             if let (Some(obj), Some(DataType::List(ref l))) = (vec.get(0), vec.get(1)) {
                 for (i, item) in l.iter().enumerate() {
@@ -909,7 +899,7 @@ pub fn setup() -> HashMap<String, DataType> {
     // assoc / assq / assv — find pair by key in association list
     let make_assoc = |cmp: fn(&DataType, &DataType) -> bool, name: &str| -> DataType {
         let name = name.to_string();
-        DataType::Proc(Function(Rc::new(move |vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        DataType::Proc(Function(Rc::new(move |vec: Vec<DataType>, _: EnvRef| {
             if vec.len() != 2 { return Err(SchemeError::RuntimeError(format!("{} requires 2 arguments", name))); }
             if let (Some(key), Some(DataType::List(ref l))) = (vec.get(0), vec.get(1)) {
                 for pair in l.iter() {
@@ -948,7 +938,7 @@ pub fn setup() -> HashMap<String, DataType> {
 
     // --- String utilities ---
 
-    map.insert("string=?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("string=?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 2 { return Err("string=? requires 2 arguments".into()); }
         if let (Some(DataType::String(ref a)), Some(DataType::String(ref b))) = (vec.get(0), vec.get(1)) {
             Ok(Some(DataType::Bool(a == b)))
@@ -957,7 +947,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("string<?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("string<?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 2 { return Err("string<? requires 2 arguments".into()); }
         if let (Some(DataType::String(ref a)), Some(DataType::String(ref b))) = (vec.get(0), vec.get(1)) {
             Ok(Some(DataType::Bool(a < b)))
@@ -966,7 +956,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("string>?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("string>?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 2 { return Err("string>? requires 2 arguments".into()); }
         if let (Some(DataType::String(ref a)), Some(DataType::String(ref b))) = (vec.get(0), vec.get(1)) {
             Ok(Some(DataType::Bool(a > b)))
@@ -975,7 +965,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("substring".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("substring".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() < 3 { return Err("substring requires 3 arguments".into()); }
         if let (Some(DataType::String(ref s)), Some(start), Some(end)) = (vec.get(0), vec.get(1), vec.get(2)) {
             let st = start.as_f64().unwrap() as usize;
@@ -989,7 +979,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("string-ref".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("string-ref".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 2 { return Err("string-ref requires 2 arguments".into()); }
         if let (Some(DataType::String(ref s)), Some(idx)) = (vec.get(0), vec.get(1)) {
             let i = idx.as_f64().unwrap() as usize;
@@ -1003,7 +993,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("string->list".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("string->list".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("string->list requires 1 argument".into()); }
         if let Some(DataType::String(ref s)) = vec.get(0) {
             // No char type — return list of 1-char strings
@@ -1013,7 +1003,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("list->string".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("list->string".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("list->string requires 1 argument".into()); }
         if let Some(DataType::List(ref l)) = vec.get(0) {
             let mut result = String::new();
@@ -1030,7 +1020,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("make-string".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("make-string".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() < 1 { return Err("make-string requires at least 1 argument".into()); }
         let n = vec.get(0).map(|d| d.as_f64().unwrap() as usize).unwrap_or(0);
         let fill = vec.get(1).and_then(|d| if let DataType::String(ref s) = d { s.chars().next() } else { None }).unwrap_or(' ');
@@ -1039,7 +1029,7 @@ pub fn setup() -> HashMap<String, DataType> {
 
     // --- Math functions ---
 
-    map.insert("sqrt".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("sqrt".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("sqrt requires 1 argument".into()); }
         if let Some(n) = vec.get(0) {
             if !n.is_number() { return Err("sqrt requires a number".into()); }
@@ -1049,7 +1039,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("expt".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("expt".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 2 { return Err("expt requires 2 arguments".into()); }
         if let (Some(base), Some(exp)) = (vec.get(0), vec.get(1)) {
             if !base.is_number() || !exp.is_number() { return Err("expt requires numbers".into()); }
@@ -1067,7 +1057,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
-    map.insert("floor".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("floor".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("floor requires 1 argument".into()); }
         if let Some(n) = vec.get(0) {
             if !n.is_number() { return Err("floor requires a number".into()); }
@@ -1076,7 +1066,7 @@ pub fn setup() -> HashMap<String, DataType> {
         } else { Err("floor requires a number".into()) }
     }))));
 
-    map.insert("ceiling".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("ceiling".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("ceiling requires 1 argument".into()); }
         if let Some(n) = vec.get(0) {
             if !n.is_number() { return Err("ceiling requires a number".into()); }
@@ -1084,7 +1074,7 @@ pub fn setup() -> HashMap<String, DataType> {
         } else { Err("ceiling requires a number".into()) }
     }))));
 
-    map.insert("round".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("round".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("round requires 1 argument".into()); }
         if let Some(n) = vec.get(0) {
             if !n.is_number() { return Err("round requires a number".into()); }
@@ -1092,7 +1082,7 @@ pub fn setup() -> HashMap<String, DataType> {
         } else { Err("round requires a number".into()) }
     }))));
 
-    map.insert("truncate".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("truncate".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.len() != 1 { return Err("truncate requires 1 argument".into()); }
         if let Some(n) = vec.get(0) {
             if !n.is_number() { return Err("truncate requires a number".into()); }
@@ -1100,7 +1090,7 @@ pub fn setup() -> HashMap<String, DataType> {
         } else { Err("truncate requires a number".into()) }
     }))));
 
-    map.insert("gcd".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("gcd".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.is_empty() { return Ok(Some(DataType::Integer(0))); }
         let mut result: i64 = 0;
         for arg in vec.iter() {
@@ -1118,7 +1108,7 @@ pub fn setup() -> HashMap<String, DataType> {
         Ok(Some(DataType::Integer(result)))
     }))));
 
-    map.insert("lcm".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("lcm".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.is_empty() { return Ok(Some(DataType::Integer(1))); }
         let mut result: i64 = 1;
         for arg in vec.iter() {
@@ -1139,7 +1129,7 @@ pub fn setup() -> HashMap<String, DataType> {
 
     // --- Error handling ---
 
-    map.insert("error".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+    map.insert("error".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
         if vec.is_empty() { return Err(SchemeError::RuntimeError("error".to_string())); }
         let mut msg = String::new();
         if let Some(DataType::String(ref s)) = vec.get(0) {

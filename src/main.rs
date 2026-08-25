@@ -1,11 +1,9 @@
-use std::cell::RefCell;
 use std::env;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::io::Write;
 use std::path::Path;
-use std::rc::Rc;
 use log::debug;
 use scheme_rs::*;
 
@@ -50,13 +48,8 @@ fn main() {
 fn execute(input: String) {
     io::stdout().flush().expect("cannot flush screen");
 
-    let local = Box::new(RefCell::new(scheme_rs::setup()));
-    let env = scheme_rs::Env {
-        local,
-        parent: None
-    };
-    debug!("Env: {:?}", env);
-    let rc_env = Rc::new(RefCell::new(env));
+    let rc_env = Env::root(scheme_rs::setup());
+    debug!("Env: {:?}", rc_env);
 
     match parse(input.as_str()).and_then(|ast| eval(Some(ast.result), rc_env.clone())) {
         Ok(Some(d)) => println!("{:?}", d),
