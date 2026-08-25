@@ -193,35 +193,35 @@
 
 ### Builtins (builtins.rs)
 
-- [ ] **Task 23: `eq?` / `eqv?` / `equal?`**
+- [x] **Task 23: `eq?` / `eqv?` / `equal?`**
   - Acceptance: `(eq? 'a 'a)` → `#t`, `(eqv? 1 1)` → `#t`, `(equal? (list 1 2) (list 1 2))` → `#t`
-  - Verify: New test `equality_predicates_test` passes, all existing tests pass
+  - Verify: New test `equality_predicates_test` passes, all 47 tests pass
   - Files: `src/builtins.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
-- [ ] **Task 24: `display` / `newline`**
+- [x] **Task 24: `display` / `newline`**
   - Acceptance: `(display "hello")` prints `hello` (no quotes), `(newline)` prints a newline
-  - Verify: New test `display_newline_test` passes, all existing tests pass
+  - Verify: New test `display_newline_test` passes, all 47 tests pass
   - Files: `src/builtins.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
-- [ ] **Task 25: String operations**
+- [x] **Task 25: String operations**
   - Acceptance: `(string-length "abc")` → `3`, `(string-append "a" "b")` → `"ab"`, `(string->symbol "x")` → `'x`, `(symbol->string 'x)` → `"x"`
-  - Verify: New test `string_operations_test` passes, all existing tests pass
+  - Verify: New test `string_operations_test` passes, all 47 tests pass
   - Files: `src/builtins.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
-- [ ] **Task 26: Type/number predicates + integer division**
+- [x] **Task 26: Type/number predicates + integer division**
   - Acceptance: `(boolean? #t)` → `#t`, `(zero? 0)` → `#t`, `(positive? 1)` → `#t`, `(negative? -1)` → `#t`, `(modulo 7 3)` → `1`, `(quotient 7 3)` → `2`, `(remainder 7 3)` → `1`, `(even? 4)` → `#t`, `(odd? 3)` → `#t`
-  - Verify: New test `predicates_and_int_div_test` passes, all existing tests pass
+  - Verify: New test `predicates_and_int_div_test` passes, all 47 tests pass
   - Files: `src/builtins.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 ### Checkpoint: R5RS Features
-- [ ] `let`, `cond`, `set!`, `when`/`unless`, `case` all work
-- [ ] `eq?`/`eqv?`/`equal?`, `display`/`newline`, string ops, predicates, integer division all work
-- [ ] All 38+ tests pass (new tests added for each feature)
-- [ ] Zero compiler warnings
+- [x] `let`, `cond`, `set!`, `when`/`unless`, `case` all work
+- [x] `eq?`/`eqv?`/`equal?`, `display`/`newline`, string ops, predicates, integer division all work
+- [x] All 47 tests pass (was 38, added 9 new tests)
+- [x] Zero compiler warnings
 
 ---
 

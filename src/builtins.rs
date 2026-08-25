@@ -648,5 +648,173 @@ pub fn setup() -> HashMap<String, DataType> {
     //    }
     //    debug!("map end");
 
+    // --- R5RS equality predicates ---
+
+    // eq? — identity comparison (same symbol, same number, same bool)
+    map.insert("eq?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 2 { return Err("eq? requires 2 arguments".into()); }
+        let a = vec.get(0).unwrap();
+        let b = vec.get(1).unwrap();
+        Ok(Some(DataType::Bool(a == b)))
+    }))));
+
+    // eqv? — same as eq? for our purposes (numbers, symbols, bools)
+    map.insert("eqv?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 2 { return Err("eqv? requires 2 arguments".into()); }
+        let a = vec.get(0).unwrap();
+        let b = vec.get(1).unwrap();
+        Ok(Some(DataType::Bool(a == b)))
+    }))));
+
+    // equal? — deep equality (lists compared element-wise)
+    map.insert("equal?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 2 { return Err("equal? requires 2 arguments".into()); }
+        let a = vec.get(0).unwrap();
+        let b = vec.get(1).unwrap();
+        Ok(Some(DataType::Bool(a == b)))
+    }))));
+
+    // --- R5RS output ---
+
+    // display — print without quotes (strings show raw, symbols show without ')
+    map.insert("display".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("display requires 1 argument".into()); }
+        let val = vec.get(0).unwrap();
+        let s = match val {
+            &DataType::String(ref s) => s.clone(),
+            &DataType::Symbol(ref s) => s.clone(),
+            &DataType::Bool(b) => if b { "#t".to_string() } else { "#f".to_string() },
+            ref other => datatype2str(other),
+        };
+        print!("{}", s);
+        Ok(None)
+    }))));
+
+    // newline — print a newline
+    map.insert("newline".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if !vec.is_empty() { return Err("newline takes no arguments".into()); }
+        println!();
+        Ok(None)
+    }))));
+
+    // --- R5RS string operations ---
+
+    map.insert("string-length".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("string-length requires 1 argument".into()); }
+        match vec.get(0) {
+            Some(&DataType::String(ref s)) => Ok(Some(DataType::Number(s.len() as f64))),
+            _ => Err("string-length requires a string".into()),
+        }
+    }))));
+
+    map.insert("string-append".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        let mut result = String::new();
+        for arg in &vec {
+            match arg {
+                &DataType::String(ref s) => result.push_str(s),
+                _ => return Err("string-append requires string arguments".into()),
+            }
+        }
+        Ok(Some(DataType::String(result)))
+    }))));
+
+    map.insert("string->symbol".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("string->symbol requires 1 argument".into()); }
+        match vec.get(0) {
+            Some(&DataType::String(ref s)) => Ok(Some(DataType::Symbol(s.clone()))),
+            _ => Err("string->symbol requires a string".into()),
+        }
+    }))));
+
+    map.insert("symbol->string".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("symbol->string requires 1 argument".into()); }
+        match vec.get(0) {
+            Some(&DataType::Symbol(ref s)) => Ok(Some(DataType::String(s.clone()))),
+            _ => Err("symbol->string requires a symbol".into()),
+        }
+    }))));
+
+    // --- R5RS type/number predicates ---
+
+    map.insert("boolean?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("boolean? requires 1 argument".into()); }
+        match vec.get(0) {
+            Some(&DataType::Bool(_)) => Ok(Some(DataType::Bool(true))),
+            _ => Ok(Some(DataType::Bool(false))),
+        }
+    }))));
+
+    map.insert("zero?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("zero? requires 1 argument".into()); }
+        match vec.get(0) {
+            Some(&DataType::Number(n)) => Ok(Some(DataType::Bool(n == 0.0))),
+            _ => Err("zero? requires a number".into()),
+        }
+    }))));
+
+    map.insert("positive?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("positive? requires 1 argument".into()); }
+        match vec.get(0) {
+            Some(&DataType::Number(n)) => Ok(Some(DataType::Bool(n > 0.0))),
+            _ => Err("positive? requires a number".into()),
+        }
+    }))));
+
+    map.insert("negative?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("negative? requires 1 argument".into()); }
+        match vec.get(0) {
+            Some(&DataType::Number(n)) => Ok(Some(DataType::Bool(n < 0.0))),
+            _ => Err("negative? requires a number".into()),
+        }
+    }))));
+
+    map.insert("even?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("even? requires 1 argument".into()); }
+        match vec.get(0) {
+            Some(&DataType::Number(n)) => Ok(Some(DataType::Bool(n as i64 % 2 == 0))),
+            _ => Err("even? requires a number".into()),
+        }
+    }))));
+
+    map.insert("odd?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("odd? requires 1 argument".into()); }
+        match vec.get(0) {
+            Some(&DataType::Number(n)) => Ok(Some(DataType::Bool(n as i64 % 2 != 0))),
+            _ => Err("odd? requires a number".into()),
+        }
+    }))));
+
+    // --- R5RS integer division ---
+
+    map.insert("modulo".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 2 { return Err("modulo requires 2 arguments".into()); }
+        if let (Some(&DataType::Number(a)), Some(&DataType::Number(b))) = (vec.get(0), vec.get(1)) {
+            if b == 0.0 { return Err(SchemeError::DivisionByZero); }
+            Ok(Some(DataType::Number((a as i64 % b as i64) as f64)))
+        } else {
+            Err("modulo requires numbers".into())
+        }
+    }))));
+
+    map.insert("quotient".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 2 { return Err("quotient requires 2 arguments".into()); }
+        if let (Some(&DataType::Number(a)), Some(&DataType::Number(b))) = (vec.get(0), vec.get(1)) {
+            if b == 0.0 { return Err(SchemeError::DivisionByZero); }
+            Ok(Some(DataType::Number((a as i64 / b as i64) as f64)))
+        } else {
+            Err("quotient requires numbers".into())
+        }
+    }))));
+
+    map.insert("remainder".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 2 { return Err("remainder requires 2 arguments".into()); }
+        if let (Some(&DataType::Number(a)), Some(&DataType::Number(b))) = (vec.get(0), vec.get(1)) {
+            if b == 0.0 { return Err(SchemeError::DivisionByZero); }
+            Ok(Some(DataType::Number((a as i64 % b as i64) as f64)))
+        } else {
+            Err("remainder requires numbers".into())
+        }
+    }))));
+
     return map;
 }

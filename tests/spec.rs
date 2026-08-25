@@ -296,6 +296,58 @@ fn case_test() {
 }
 
 #[test]
+fn equality_predicates_test() {
+    // eq? with symbols
+    assert_eq!(Ok(Some(DataType::Bool(true))), run("(eq? 'a 'a)").value);
+    assert_eq!(Ok(Some(DataType::Bool(false))), run("(eq? 'a 'b)").value);
+    // eqv? with numbers
+    assert_eq!(Ok(Some(DataType::Bool(true))), run("(eqv? 1 1)").value);
+    assert_eq!(Ok(Some(DataType::Bool(false))), run("(eqv? 1 2)").value);
+    // equal? with lists
+    assert_eq!(Ok(Some(DataType::Bool(true))), run("(equal? (list 1 2) (list 1 2))").value);
+    assert_eq!(Ok(Some(DataType::Bool(false))), run("(equal? (list 1 2) (list 1 3))").value);
+}
+
+#[test]
+fn display_newline_test() {
+    // display and newline return None (they're side-effect only)
+    assert_eq!(Ok(None), run(r#"(display "hello")"#).value);
+    assert_eq!(Ok(None), run("(newline)").value);
+    // display with a number
+    assert_eq!(Ok(None), run("(display 42)").value);
+}
+
+#[test]
+fn string_operations_test() {
+    // string-length
+    assert_eq!(Ok(Some(DataType::Number(3.0))), run(r#"(string-length "abc")"#).value);
+    // string-append
+    assert_eq!(Ok(Some(DataType::String("ab".to_string()))), run(r#"(string-append "a" "b")"#).value);
+    // string->symbol
+    assert_eq!(Ok(Some(DataType::Symbol("x".to_string()))), run(r#"(string->symbol "x")"#).value);
+    // symbol->string
+    assert_eq!(Ok(Some(DataType::String("x".to_string()))), run("(symbol->string 'x)").value);
+}
+
+#[test]
+fn predicates_and_int_div_test() {
+    // boolean?
+    assert_eq!(Ok(Some(DataType::Bool(true))), run("(boolean? #t)").value);
+    assert_eq!(Ok(Some(DataType::Bool(false))), run("(boolean? 1)").value);
+    // zero?, positive?, negative?
+    assert_eq!(Ok(Some(DataType::Bool(true))), run("(zero? 0)").value);
+    assert_eq!(Ok(Some(DataType::Bool(true))), run("(positive? 1)").value);
+    assert_eq!(Ok(Some(DataType::Bool(true))), run("(negative? -1)").value);
+    // even?, odd?
+    assert_eq!(Ok(Some(DataType::Bool(true))), run("(even? 4)").value);
+    assert_eq!(Ok(Some(DataType::Bool(true))), run("(odd? 3)").value);
+    // modulo, quotient, remainder
+    assert_eq!(Ok(Some(DataType::Number(1.0))), run("(modulo 7 3)").value);
+    assert_eq!(Ok(Some(DataType::Number(2.0))), run("(quotient 7 3)").value);
+    assert_eq!(Ok(Some(DataType::Number(1.0))), run("(remainder 7 3)").value);
+}
+
+#[test]
 fn tricky_test1 () {
 
     // Testing the case that the 1st element is a children and it returns a function/lambda after an evaluation
