@@ -10,8 +10,11 @@ use log::debug;
 mod error;
 pub use error::SchemeError;
 
+mod env;
+pub use env::Env;
+
 mod types;
-pub use types::{AST, ReadFromTokenResult, Procedure, Function, DataType, Env, FloatIterExt};
+pub use types::{AST, ReadFromTokenResult, Procedure, Function, DataType, FloatIterExt};
 
 mod parser;
 pub use parser::parse;

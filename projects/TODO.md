@@ -92,11 +92,11 @@
   - Files: `src/parser.rs` (new), `src/lib.rs`
   - Status: `[x]` done
 
-- [ ] **Task 11: Extract `env.rs`**
+- [x] **Task 11: Extract `env.rs`**
   - Acceptance: `Env` impl block (the `get` method) lives in `src/env.rs`.
   - Verify: `cargo build` succeeds, `cargo test` passes (30+)
   - Files: `src/env.rs` (new), `src/lib.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 - [ ] **Task 12: Extract `eval.rs`**
   - Acceptance: `eval`, `ast_symbol_expression`, `quote_expression`, `if_expression`, `define_expression`, `lambda_expression`, `prepare_arguments`, `execute`, `ast2datatype`, `datatype2str` live in `src/eval.rs`.
