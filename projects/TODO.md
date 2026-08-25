@@ -249,9 +249,23 @@
 
 ---
 
+## Phase 7: CI Migration (`ci`)
+
+- [x] **Task 29: Migrate Travis CI to GitHub Actions**
+  - Acceptance: `.github/workflows/ci.yml` runs `cargo build` and `cargo test` on push/PR. `.travis.yml` is removed. Tests stable Rust (nightly allowed to fail for bench-only).
+  - Verify: Workflow file is valid YAML, `cargo test` passes locally
+  - Files: `.github/workflows/ci.yml` (new), `.travis.yml` (deleted)
+  - Status: `[x]` done
+
+### Checkpoint: CI Migration
+- [x] GitHub Actions workflow exists and is valid
+- [x] Travis config removed
+- [x] All 49 tests still pass
+
+---
+
 ## Known Issues (Deferred — Not in This Round)
 
 - [ ] **Integer precision loss**: All numbers are `f64`. `i64` is cast to `f64` at eval time. Fix requires a numeric tower (BigInt or at least i64/f64 distinction).
-- [ ] **Travis CI is dead**: No working CI. Should migrate to GitHub Actions.
 - [ ] **5 unpushed commits on master**: Should push before merging this branch back.
 - [ ] **Advanced R5RS features deferred**: `quasiquote`/`unquote`, `do` loops, named `let`, macros (`define-syntax`/`syntax-rules`), `call/cc`.
