@@ -2,25 +2,26 @@
 
 > **Branch**: `fix/interpreter-improvements`
 > **Base commit**: `2d9069f` (docs: add spec, plan, and TODO for interpreter improvements)
-> **Head commit**: `183d478` (refactor: extract builtins.rs, lib.rs is now module hub)
+> **Head commit**: `b200970` (fix: lambda fresh env per call, string type in quote, Env::get cloning)
 > **Date**: 2026-08-25
-> **Commits**: 13 (each task commit includes its own TODO.md status update)
+> **Commits**: 16 (15 task commits with TODO.md updates folded in + 1 summary report commit)
 
 ---
 
 ## Overview
 
-This branch refactored and hardened the `scheme-rs` Scheme interpreter (a Rust port of Peter Norvig's `lispy`). Work was organized into three phases — Foundation, Bug Fixes, and Module Split — covering 14 tasks total. The original 1300-line `src/lib.rs` monolith was split into 6 focused modules, four user-facing bugs were fixed, and all `panic!`/`unreachable!` calls reachable from user input were replaced with proper error types.
+This branch refactored and hardened the `scheme-rs` Scheme interpreter (a Rust port of Peter Norvig's `lispy`). Work was organized into four phases — Foundation, Bug Fixes, Module Split, and Architecture Fixes — covering 17 tasks total. The original 1300-line `src/lib.rs` monolith was split into 6 focused modules, four user-facing bugs were fixed, all `panic!`/`unreachable!` calls reachable from user input were replaced with proper error types, and three critical architecture faults were fixed (lambda env mutation, string type confusion, Env::get cloning landmine).
 
 ### Final State
 
 | Metric | Before | After |
 |--------|--------|-------|
-| Tests passing | 30/30 | 33/33 |
+| Tests passing | 30/30 | 38/38 |
 | Compiler warnings | 2 (unused `tuplet!` macro) | 0 |
 | `lib.rs` line count | ~1300 | 17 |
 | Source files | 4 (`lib.rs`, `main.rs`, `cli.rs`, `bench.rs`) | 10 (above + 6 new modules) |
 | Error type | `&'static str` | `SchemeError` enum (6 variants) |
+| Lambda call sites | 4 (inconsistent env handling) | 4 (all use fresh env frames) |
 
 ---
 
@@ -145,6 +146,36 @@ Moved out of `lib.rs` (652 lines):
 
 ---
 
+## Phase 4: Architecture Fixes (Tasks 15-17)
+
+After the module split, a code review revealed three critical architecture faults beyond the original 14 tasks. These were fixed in a single commit `b200970`.
+
+### Task 15: Fix lambda env mutation across all 4 call sites — `b200970`
+
+- **Bug**: Each lambda call either mutated the closure's captured env (children path in `eval.rs`) or cloned it (symbol path, `apply`, `map`), causing stale parameter bindings to leak between calls. The 4 call sites were inconsistent.
+- **Fix**: All 4 call sites now create a fresh empty `HashMap` per call, bind only the current arguments, and parent it to the closure's env. This is correct lexical scoping semantics.
+- **Call sites fixed**:
+  - `eval.rs` symbol path (line ~199) — was already cloning, now uses fresh frame
+  - `eval.rs` children path (line ~247) — was mutating the closure env directly, now uses fresh frame
+  - `builtins.rs` `apply` (line ~299) — was cloning, now uses fresh frame
+  - `builtins.rs` `map` (line ~465) — was cloning, now uses fresh frame
+- **Tests added**: `lambda_fresh_env_test`, `lambda_no_arg_leak_test`, `lambda_via_apply_fresh_env_test`, `lambda_via_map_fresh_env_test`
+
+### Task 16: Fix string type confusion in `ast2datatype` — `b200970`
+
+- **Bug**: `ast2datatype` converted quoted string literals like `(quote "hello")` to `DataType::Symbol` instead of `DataType::String`. This meant `string?` returned `#f` for quoted strings. Additionally, lambda creation required the body to be `AST::Children`, so `(lambda (x) x)` (single-expression body) failed with a syntax error.
+- **Fix**: `ast2datatype` now produces `DataType::String` for quoted strings. Lambda creation accepts any `AST` for the body, not just `AST::Children`.
+- **Tests added**: `quote_string_type_test`. Updated `quote_expression_test` to expect `DataType::String`.
+
+### Task 17: Fix `Env::get` per-variant cloning landmine — `b200970`
+
+- **Bug**: `Env::get` had a 9-line manual match on every `DataType` variant to clone the value. If a new `DataType` variant were added in the future, `get` would silently return `None` for it — a maintenance landmine.
+- **Fix**: Replaced with a 1-line `.cloned()` call. Future-proof and correct.
+
+**Architecture Fixes checkpoint**: 38/38 tests pass (was 33), zero warnings, all 4 lambda call sites use fresh env frames, quoted strings are `DataType::String`, `Env::get` is future-proof.
+
+---
+
 ## Final Module Layout
 
 ```
@@ -166,30 +197,31 @@ src/
 ## Diff Statistics
 
 ```
- 13 files changed, 1466 insertions(+), 1352 deletions(-)
+ 14 files changed, 1556 insertions(+), 1379 deletions(-)
 ```
 
 | File | Change |
 |------|--------|
 | `Cargo.toml` | +1 (edition = "2021") |
 | `src/lib.rs` | -1272 (1300 → 17, logic moved to modules) |
-| `src/builtins.rs` | +652 (new) |
-| `src/eval.rs` | +375 (new) |
+| `src/builtins.rs` | +652 (new) + 8 modified (lambda fresh env in apply/map) |
+| `src/eval.rs` | +375 (new) + 27 modified (lambda fresh env, string type, single-expr body) |
 | `src/parser.rs` | +138 (new) |
 | `src/types.rs` | +99 (new) |
 | `src/error.rs` | +48 (new) |
-| `src/env.rs` | +37 (new) |
+| `src/env.rs` | +37 (new) + 11 modified (Env::get .cloned()) |
 | `src/main.rs` | +9/-9 (removed extern crate) |
 | `src/cli.rs` | +7/-7 (removed extern crate) |
 | `src/bench.rs` | +6/-6 (removed extern crate) |
-| `tests/spec.rs` | +65 (3 new test cases) |
+| `tests/spec.rs` | +136 (8 new test cases + 1 updated) |
 | `projects/TODO.md` | +92/-92 (status updates, folded into task commits) |
+| `docs/` | +231 (summary report) |
 
 ---
 
 ## Commit History
 
-Each commit is self-contained: code change + corresponding TODO.md status update.
+Each task commit (1-14) is self-contained: code change + corresponding TODO.md status update. Phase 4 fixes were committed together as they were interrelated.
 
 ```
 b5887b9  chore: bump to edition 2021, remove extern crate
@@ -205,27 +237,28 @@ a29a4a4  refactor: extract parser.rs module
 160dbaf  refactor: extract env.rs module
 874ad8c  refactor: extract eval.rs module
 183d478  refactor: extract builtins.rs, lib.rs is now module hub
+787c336  docs: add interpreter improvements summary report
+b200970  fix: lambda fresh env per call, string type in quote, Env::get cloning
 ```
 
 ---
 
 ## Known Issues (Deferred — Not in This Round)
 
-These were documented in `projects/TODO.md` but intentionally left for future work:
+These remain documented in `projects/TODO.md` for future work:
 
-1. **Lambda env mutation bug** — each lambda call mutates the captured env instead of creating a fresh local scope. Breaks `set!` and proper closure semantics.
-2. **No tail-call optimization** — deep recursion overflows the stack (~10k frames). Needs a trampoline or explicit loop in `eval` for tail positions.
-3. **Integer precision loss** — all numbers are `f64`. `i64` is cast to `f64` at eval time. Needs a numeric tower.
-4. **Missing R5RS features** — `let`, `cond`, `case`, `set!`, `when`/`unless`, `quasiquote`/`unquote`, `eq?`/`eqv?`/`equal?`, `string-*` operations, `display`/`newline`, `do` loops, named `let`, macros.
-5. **Travis CI is dead** — no working CI. Should migrate to GitHub Actions.
-6. **5 unpushed commits on master** — should push before merging this branch back.
+1. **No tail-call optimization** — deep recursion overflows the stack (~10k frames). Needs a trampoline or explicit loop in `eval` for tail positions.
+2. **Integer precision loss** — all numbers are `f64`. `i64` is cast to `f64` at eval time. Needs a numeric tower.
+3. **Missing R5RS features** — `let`, `cond`, `case`, `set!`, `when`/`unless`, `quasiquote`/`unquote`, `eq?`/`eqv?`/`equal?`, `string-*` operations, `display`/`newline`, `do` loops, named `let`, macros.
+4. **Travis CI is dead** — no working CI. Should migrate to GitHub Actions.
+5. **5 unpushed commits on master** — should push before merging this branch back.
 
 ---
 
 ## Verification
 
 - `cargo build --release` — succeeds, zero warnings
-- `cargo test` — 33/33 pass (was 30/30; added 3 bug-fix tests)
+- `cargo test` — 38/38 pass (was 30/30; added 8 new tests across Phases 2 and 4)
 - `grep -rn "panic!\|unreachable!" src/` — no reachable panics from user input
 - `wc -l src/lib.rs` — 17 lines (target was < 100)
 - Each module compiles independently via `cargo build`

@@ -125,9 +125,38 @@
 
 ---
 
+## Phase 4: Architecture Fixes (`archfix`)
+
+- [x] **Task 15: Fix lambda env mutation across all 4 call sites**
+  - Acceptance: Each lambda call creates a fresh empty `HashMap` for params, parented to the closure's env. No stale bindings leak between calls. All 4 call sites fixed: `eval.rs` symbol path, `eval.rs` children path, `builtins.rs` `apply`, `builtins.rs` `map`.
+  - Verify: New tests `lambda_fresh_env_test`, `lambda_no_arg_leak_test`, `lambda_via_apply_fresh_env_test`, `lambda_via_map_fresh_env_test` pass
+  - Files: `src/eval.rs`, `src/builtins.rs`, `tests/spec.rs`
+  - Status: `[x]` done (commit `b200970`)
+
+- [x] **Task 16: Fix string type confusion in `ast2datatype`**
+  - Acceptance: `(quote "hello")` produces `DataType::String`, not `DataType::Symbol`. `string?` returns `#t` for quoted strings. Also: lambda body accepts single expressions (not just `AST::Children`), so `(lambda (x) x)` works.
+  - Verify: New test `quote_string_type_test` passes, updated `quote_expression_test` expects `DataType::String`
+  - Files: `src/eval.rs`, `tests/spec.rs`
+  - Status: `[x]` done (commit `b200970`)
+
+- [x] **Task 17: Fix `Env::get` per-variant cloning landmine**
+  - Acceptance: `Env::get` uses `.cloned()` instead of manual per-variant match. Future `DataType` variants won't silently return `None`.
+  - Verify: `cargo build` succeeds, all tests pass
+  - Files: `src/env.rs`
+  - Status: `[x]` done (commit `b200970`)
+
+### Checkpoint: Architecture Fixes
+- [x] Lambda calls use fresh env frames (4 call sites)
+- [x] Quoted strings are `DataType::String`
+- [x] Single-expression lambda bodies work
+- [x] `Env::get` is future-proof
+- [x] 38/38 tests pass (was 33)
+- [x] Zero compiler warnings
+
+---
+
 ## Known Issues (Deferred — Not in This Round)
 
-- [ ] **Lambda env mutation bug**: Each lambda call mutates the captured env instead of creating a fresh local scope. This breaks `set!` and proper closure semantics. Fix requires reworking `Procedure` to create a new env frame per call.
 - [ ] **No tail-call optimization**: Deep recursion overflows the stack (~10k frames). Fix requires a trampoline or explicit loop in `eval` for tail positions.
 - [ ] **Integer precision loss**: All numbers are `f64`. `i64` is cast to `f64` at eval time. Fix requires a numeric tower (BigInt or at least i64/f64 distinction).
 - [ ] **Missing R5RS features**: `let`, `cond`, `case`, `set!`, `when`/`unless`, `quasiquote`/`unquote`, `eq?`/`eqv?`/`equal?`, `string-*` operations, `display`/`newline`, `do` loops, named `let`, macros.
