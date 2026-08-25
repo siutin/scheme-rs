@@ -179,17 +179,17 @@
   - Files: `src/eval.rs`, `src/env.rs`, `tests/spec.rs`
   - Status: `[x]` done
 
-- [ ] **Task 21: `when` / `unless`**
+- [x] **Task 21: `when` / `unless`**
   - Acceptance: `(when #t 1)` returns `1`, `(when #f 1)` returns unspecified, `(unless #t 1)` returns unspecified, `(unless #f 1)` returns `1`
-  - Verify: New test `when_unless_test` passes, all existing tests pass
+  - Verify: New test `when_unless_test` passes, all 43 tests pass
   - Files: `src/eval.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
-- [ ] **Task 22: `case` — key dispatch**
+- [x] **Task 22: `case` — key dispatch**
   - Acceptance: `(case 2 ((1) 'one) ((2) 'two) (else 'other))` returns `'two`
-  - Verify: New test `case_test` passes, all existing tests pass
+  - Verify: New test `case_test` passes, all 43 tests pass
   - Files: `src/eval.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 ### Builtins (builtins.rs)
 

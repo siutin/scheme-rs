@@ -271,6 +271,31 @@ fn set_test() {
 }
 
 #[test]
+fn when_unless_test() {
+    // when with true test
+    assert_eq!(Ok(Some(DataType::Number(1.0))), run("(when #t 1)").value);
+    // when with false test returns None
+    assert_eq!(Ok(None), run("(when #f 1)").value);
+    // unless with true test returns None
+    assert_eq!(Ok(None), run("(unless #t 1)").value);
+    // unless with false test
+    assert_eq!(Ok(Some(DataType::Number(1.0))), run("(unless #f 1)").value);
+}
+
+#[test]
+fn case_test() {
+    // Basic case with matching clause
+    let test_result = run("(case 2 ((1) 'one) ((2) 'two) (else 'other))");
+    assert_eq!(Ok(Some(DataType::Symbol("two".to_string()))), test_result.value);
+    // case falls to else
+    let test_result2 = run("(case 3 ((1) 'one) ((2) 'two) (else 'other))");
+    assert_eq!(Ok(Some(DataType::Symbol("other".to_string()))), test_result2.value);
+    // case with multiple values in a clause
+    let test_result3 = run("(case 2 ((1 2 3) 'small) ((4 5 6) 'medium) (else 'large))");
+    assert_eq!(Ok(Some(DataType::Symbol("small".to_string()))), test_result3.value);
+}
+
+#[test]
 fn tricky_test1 () {
 
     // Testing the case that the 1st element is a children and it returns a function/lambda after an evaluation

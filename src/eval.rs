@@ -270,6 +270,80 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                             Err("set! requires a symbol and a value".into())
                         }
                     }
+                    "when" => {
+                        // (when test body) — eval body if test is true
+                        if let (Some(test_ast), Some(body_ast)) = (s1, s2) {
+                            match eval(Some(test_ast.clone()), env.clone()) {
+                                Ok(Some(DataType::Bool(true))) => eval(Some(body_ast.clone()), env.clone()),
+                                Ok(Some(DataType::Bool(false))) | Ok(None) => Ok(None),
+                                Ok(_) => Err("when requires a boolean test".into()),
+                                Err(e) => Err(e),
+                            }
+                        } else {
+                            Err("when requires a test and a body".into())
+                        }
+                    }
+                    "unless" => {
+                        // (unless test body) — eval body if test is false
+                        if let (Some(test_ast), Some(body_ast)) = (s1, s2) {
+                            match eval(Some(test_ast.clone()), env.clone()) {
+                                Ok(Some(DataType::Bool(false))) => eval(Some(body_ast.clone()), env.clone()),
+                                Ok(Some(DataType::Bool(true))) | Ok(None) => Ok(None),
+                                Ok(_) => Err("unless requires a boolean test".into()),
+                                Err(e) => Err(e),
+                            }
+                        } else {
+                            Err("unless requires a test and a body".into())
+                        }
+                    }
+                    "case" => {
+                        // (case key clause...) — each clause is ((vals...) body) or (else body)
+                        if let Some(key_ast) = s1 {
+                            match eval(Some(key_ast.clone()), env.clone()) {
+                                Ok(Some(key_val)) => {
+                                    let mut result = Ok(Some(DataType::Bool(false)));
+                                    for i in 2..list.len() {
+                                        if let Some(&AST::Children(ref clause)) = list.get(i) {
+                                            let vals = clause.get(0);
+                                            let body = clause.get(1);
+                                            // Check for else
+                                            let is_else = match vals {
+                                                Some(&AST::Symbol(ref s)) if s == "else" => true,
+                                                _ => false,
+                                            };
+                                            if is_else {
+                                                if let Some(body_ast) = body {
+                                                    result = eval(Some(body_ast.clone()), env.clone());
+                                                }
+                                                break;
+                                            }
+                                            // Check if key matches any value in the list
+                                            if let Some(&AST::Children(ref val_list)) = vals {
+                                                let matched = val_list.iter().any(|v| {
+                                                    if let Ok(d) = ast2datatype(v) {
+                                                        d == key_val
+                                                    } else {
+                                                        false
+                                                    }
+                                                });
+                                                if matched {
+                                                    if let Some(body_ast) = body {
+                                                        result = eval(Some(body_ast.clone()), env.clone());
+                                                    }
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    result
+                                }
+                                Ok(None) => Ok(None),
+                                Err(e) => Err(e),
+                            }
+                        } else {
+                            Err("case requires a key".into())
+                        }
+                    }
                     _ => {
                         debug!("Some(AST::Symbol) but not define");
                         debug!("proc_key : {}", s0);
