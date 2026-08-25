@@ -105,6 +105,16 @@ fn complex_lambda_test() {
 }
 
 #[test]
+fn unary_minus_test() {
+    assert_eq!(Ok(Some(DataType::Number(-5.0))), run("(- 5)").value);
+    assert_eq!(Ok(Some(DataType::Number(-5.0))), run("(- 5.0)").value);
+    assert_eq!(Ok(Some(DataType::Number(7.0))), run("(- 10 3)").value);
+    assert_eq!(Ok(Some(DataType::Number(5.0))), run("(- 10 3 2)").value);
+    assert_eq!(Ok(Some(DataType::Number(-5.0))), run("(- 0 5)").value);
+    assert_eq!(Ok(Some(DataType::Number(0.0))), run("(- 5 5)").value);
+}
+
+#[test]
 fn tricky_test1 () {
 
     // Testing the case that the 1st element is a children and it returns a function/lambda after an evaluation

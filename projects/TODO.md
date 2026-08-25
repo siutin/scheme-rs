@@ -40,11 +40,11 @@
 
 ## Phase 2: Bug Fixes (`bugfixes`)
 
-- [ ] **Task 4: Fix unary minus**
+- [x] **Task 4: Fix unary minus**
   - Acceptance: `(- 5)` returns `-5.0`, `(- 5 3 1)` returns `1.0`, `(/ 5)` returns `0.2`
-  - Verify: New test `unary_minus_test` in `tests/spec.rs` passes, all 30 existing tests pass
+  - Verify: New test `unary_minus_test` in `tests/spec.rs` passes, all 31 tests pass
   - Files: `src/lib.rs` (or `builtins.rs` if module split done), `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 - [ ] **Task 5: Fix quote shorthand for lists**
   - Acceptance: `'(1 2 3)` works the same as `(quote (1 2 3))`. `'symbol` still works.
