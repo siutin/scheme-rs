@@ -2,11 +2,13 @@
 
 #![cfg_attr(feature = "unstable", feature(test))]
 #[cfg(all(feature = "unstable", test))]
+extern crate test;
+#[cfg(all(feature = "unstable", test))]
 mod bench {
     use test::Bencher;
     use std::cell::RefCell;
     use std::rc::Rc;
-    use bench::scheme_rs::*;
+    use scheme_rs::{eval, parse, setup, Env, DataType, SchemeError};
 
     #[cfg(test)]
     #[ctor::ctor]
@@ -26,7 +28,7 @@ mod bench {
 
     #[derive(Debug)]
     struct TestResult {
-        value: Result<Option<DataType>, &'static str>,
+        value: Result<Option<DataType>, SchemeError>,
         env: Rc<RefCell<Env>>
     }
 
