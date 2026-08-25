@@ -161,11 +161,11 @@
 
 ### Special Forms (eval.rs)
 
-- [ ] **Task 18: `let` — local bindings**
+- [x] **Task 18: `let` — local bindings**
   - Acceptance: `(let ((x 1) (y 2)) (+ x y))` returns `3`. Bindings are scoped to the body only.
-  - Verify: New test `let_test` passes, all 38 existing tests pass
+  - Verify: New test `let_test` passes, all 39 tests pass
   - Files: `src/eval.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 - [ ] **Task 19: `cond` — multi-branch conditional**
   - Acceptance: `(cond ((= 1 2) 'a) ((= 1 1) 'b) (else 'c))` returns `'b`. `else` clause works.

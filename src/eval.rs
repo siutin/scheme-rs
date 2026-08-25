@@ -181,6 +181,40 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                             Err("syntax error".into())
                         }
                     }
+                    "let" => {
+                        // (let ((var init) ...) body...)
+                        if let (Some(&AST::Children(ref bindings)), Some(body_ast)) = (s1, s2) {
+                            let mut local = HashMap::new();
+                            for binding in bindings.iter() {
+                                if let AST::Children(ref pair) = binding {
+                                    if let (Some(&AST::Symbol(ref name)), Some(init)) = (pair.get(0), pair.get(1)) {
+                                        match eval(Some(init.clone()), env.clone()) {
+                                            Ok(Some(val)) => { local.insert(name.clone(), val); }
+                                            Ok(None) => { local.insert(name.clone(), DataType::Bool(false)); }
+                                            Err(e) => return Err(e),
+                                        }
+                                    } else {
+                                        return Err("let binding must be (name init)".into());
+                                    }
+                                } else {
+                                    return Err("let bindings must be a list of (name init) pairs".into());
+                                }
+                            }
+                            let let_env = Env {
+                                local: Box::new(RefCell::new(local)),
+                                parent: Some(Box::new(env.clone())),
+                            };
+                            // Body can be a single expression or multiple; wrap in Children if needed
+                            let body = match body_ast {
+                                AST::Children(ref v) if v.len() == 1 => v[0].clone(),
+                                AST::Children(_) => body_ast.clone(),
+                                _ => body_ast.clone(),
+                            };
+                            eval(Some(body), Rc::new(RefCell::new(let_env)))
+                        } else {
+                            Err("let requires bindings and a body".into())
+                        }
+                    }
                     _ => {
                         debug!("Some(AST::Symbol) but not define");
                         debug!("proc_key : {}", s0);

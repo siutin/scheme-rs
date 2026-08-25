@@ -222,6 +222,22 @@ fn quote_string_type_test() {
 }
 
 #[test]
+fn let_test() {
+    // Basic let with two bindings
+    let test_result = run("(let ((x 1) (y 2)) (+ x y))");
+    assert_eq!(Ok(Some(DataType::Number(3.0))), test_result.value);
+    // Let with empty bindings
+    let test_result2 = run("(let () 42)");
+    assert_eq!(Ok(Some(DataType::Number(42.0))), test_result2.value);
+    // Let body can reference outer variables
+    let test_result3 = run(r#"
+    (define z 10)
+    (let ((x 5)) (+ x z))
+    "#);
+    assert_eq!(Ok(Some(DataType::Number(15.0))), test_result3.value);
+}
+
+#[test]
 fn tricky_test1 () {
 
     // Testing the case that the 1st element is a children and it returns a function/lambda after an evaluation
