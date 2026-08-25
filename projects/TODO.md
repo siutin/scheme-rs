@@ -353,5 +353,64 @@
 
 ## Known Issues (Deferred — Not in This Round)
 
-- [ ] **Advanced R5RS features deferred**: `quasiquote`/`unquote`, `do` loops, named `let`, macros (`define-syntax`/`syntax-rules`), `call/cc`.
+- [ ] **Macros deferred**: `define-syntax`/`syntax-rules` — complex, needs a full macro expander.
+- [ ] **`call/cc` deferred**: Needs continuation support — major architectural change.
 - [ ] **No BigInt support**: Integers are i64 only. Arbitrary precision would require num-bigint dependency.
+- [ ] **Multi-expression lambda/let bodies require explicit `begin`**: Should evaluate all body expressions in sequence, returning the last.
+- [ ] **Internal `define` in lambda bodies doesn't work**: Related to multi-expression body issue.
+
+---
+
+## Phase 10: Bug Fixes + R5RS Features (`r5rs-2`)
+
+> **Spec**: `projects/SPEC_PHASE10.md`
+
+### Bug Fixes
+
+- [ ] **Task 38: Multi-expression bodies for lambda, let, when, unless**
+  - Acceptance: `(lambda (x) (display x) x)` works without explicit `begin`. `let`, `when`, `unless` also support multi-expression bodies.
+  - Verify: New test `multi_expr_body_test` passes, all 52 existing tests pass
+  - Files: `src/eval.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 39: Verify internal define works**
+  - Acceptance: `(let () (define x 5) x)` returns 5. `(lambda () (define x 5) x)` works.
+  - Verify: New test `internal_define_test` passes
+  - Files: `tests/spec.rs`
+  - Status: `[ ]`
+
+### R5RS Features
+
+- [ ] **Task 40: quasiquote / unquote / unquote-splicing**
+  - Acceptance: `` `(1 2 ,(+ 1 2)) `` → `(1 2 3)`. `` `(1 ,@(list 2 3) 4) `` → `(1 2 3 4)`. Parser handles `` ` ``, `,`, `,@` shorthands.
+  - Verify: New test `quasiquote_test` passes
+  - Files: `src/parser.rs`, `src/eval.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 41: Named let**
+  - Acceptance: `(let loop ((i 0)) (if (= i 5) 'done (loop (+ i 1))))` → `done`. Creates a recursive procedure and calls it immediately.
+  - Verify: New test `named_let_test` passes
+  - Files: `src/eval.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 42: do loops**
+  - Acceptance: `(do ((i 0 (+ i 1))) ((= i 5) i))` → `5`. Supports var init step, test result, body.
+  - Verify: New test `do_loop_test` passes
+  - Files: `src/eval.rs`, `tests/spec.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 43: Update examples to remove begin workarounds**
+  - Acceptance: `closures.scm` uses multi-expression bodies instead of explicit `begin`. Examples use quasiquote where appropriate.
+  - Verify: All examples still run correctly
+  - Files: `examples/closures.scm`, `examples/list.scm`
+  - Status: `[ ]`
+
+### Checkpoint: Bug Fixes + R5RS Features
+- [ ] Multi-expression bodies work in lambda, let, when, unless
+- [ ] Internal define works in lambda bodies
+- [ ] quasiquote/unquote/unquote-splicing work
+- [ ] Named let works
+- [ ] do loops work
+- [ ] Examples updated, no begin workarounds
+- [ ] All tests pass
+- [ ] Zero compiler warnings
