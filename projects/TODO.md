@@ -225,9 +225,32 @@
 
 ---
 
+## Phase 6: Tail-Call Optimization (`tco`)
+
+> **Spec**: `projects/SPEC_TCO.md`
+
+- [ ] **Task 27: Convert `eval` to a trampoline loop**
+  - Acceptance: `eval` body is wrapped in `loop { ... }`. Tail positions (`if` branches, `cond`/`when`/`unless`/`case` bodies, `let` body, lambda body) use `continue` with reassigned `ast`/`env` instead of recursive `eval` calls. Non-tail positions (arguments, tests, bindings) still use recursive calls.
+  - Verify: `cargo build` succeeds, all 47 existing tests pass
+  - Files: `src/eval.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 28: Add deep recursion tests**
+  - Acceptance: `(loop 100000)` where `loop` is a self-recursive tail function returns without stack overflow. Mutual recursion (even/odd) at 100k depth also works.
+  - Verify: New tests `tco_deep_recursion_test` and `tco_mutual_recursion_test` pass, all 47 existing tests pass
+  - Files: `tests/spec.rs`
+  - Status: `[ ]`
+
+### Checkpoint: TCO
+- [ ] Deep recursion (100k+) doesn't overflow stack
+- [ ] Mutual recursion (100k+) doesn't overflow stack
+- [ ] All 49+ tests pass (47 existing + 2 new)
+- [ ] Zero compiler warnings
+
+---
+
 ## Known Issues (Deferred — Not in This Round)
 
-- [ ] **No tail-call optimization**: Deep recursion overflows the stack (~10k frames). Fix requires a trampoline or explicit loop in `eval` for tail positions.
 - [ ] **Integer precision loss**: All numbers are `f64`. `i64` is cast to `f64` at eval time. Fix requires a numeric tower (BigInt or at least i64/f64 distinction).
 - [ ] **Travis CI is dead**: No working CI. Should migrate to GitHub Actions.
 - [ ] **5 unpushed commits on master**: Should push before merging this branch back.
