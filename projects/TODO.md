@@ -324,11 +324,12 @@
 
 ### Benchmarks
 
-- [ ] **Task 36: Expand benchmark suite**
+- [x] **Task 36: Expand benchmark suite**
   - Acceptance: `bench.rs` has 6 benchmarks: fact20, fib25, tco_loop_100k, sum_to_1000, ackermann_2_8, list_ops. All compile and run via `cargo bench --features "unstable"`.
   - Verify: `cargo bench --features "unstable"` runs all 6 benchmarks
+  - Baseline results: fact20=85µs, fib25=1.07s, tco_loop_100k=320ms, sum_to_1000=4.4ms, ackermann_2_8=1.2ms, list_ops=60.7ms
   - Files: `src/bench.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 ### Performance
 
