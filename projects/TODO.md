@@ -98,11 +98,11 @@
   - Files: `src/env.rs` (new), `src/lib.rs`
   - Status: `[x]` done
 
-- [ ] **Task 12: Extract `eval.rs`**
+- [x] **Task 12: Extract `eval.rs`**
   - Acceptance: `eval`, `ast_symbol_expression`, `quote_expression`, `if_expression`, `define_expression`, `lambda_expression`, `prepare_arguments`, `execute`, `ast2datatype`, `datatype2str` live in `src/eval.rs`.
   - Verify: `cargo build` succeeds, `cargo test` passes (30+)
   - Files: `src/eval.rs` (new), `src/lib.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 - [ ] **Task 13: Extract `builtins.rs`**
   - Acceptance: `setup()` and all builtin function definitions live in `src/builtins.rs`. `define_comparison!` macro also moves there.
