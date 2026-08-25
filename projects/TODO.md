@@ -23,18 +23,18 @@
   - Files: `src/lib.rs` (new enum + all signature changes)
   - Status: `[x]` done
 
-- [ ] **Task 3: Remove `tuplet!` macro, use direct slice access**
+- [x] **Task 3: Remove `tuplet!` macro, use direct slice access**
   - Acceptance: No `tuplet!` macro definition or invocation in codebase. All destructuring uses `vec.get(N)` or pattern matching. Zero "unused variable" warnings.
   - Verify: `cargo build` with zero warnings, `cargo test` passes (30/30)
-  - Files: `src/lib.rs`
-  - Status: `[ ]`
+  - Files: `src/lib.rs`, `src/main.rs`
+  - Status: `[x]` done
 
 ### Checkpoint: Foundation
-- [ ] `cargo build` with zero warnings
-- [ ] All 30 tests pass
-- [ ] No `extern crate` in any file
-- [ ] No `&'static str` error types
-- [ ] No `tuplet!` macro
+- [x] `cargo build` with zero warnings
+- [x] All 30 tests pass
+- [x] No `extern crate` in any file
+- [x] No `&'static str` error types
+- [x] No `tuplet!` macro
 
 ---
 

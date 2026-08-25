@@ -55,32 +55,6 @@ impl From<&'static str> for SchemeError {
 }
 
 #[macro_export]
-macro_rules! tuplet {
-    { ($y:ident $(, $x:ident)*) = $v:expr } => {
-        let ($y,$($x),*, _) = tuplet!($v ; 1 ; ($($x),*) ; ($v.get(0)) ); };
-    { ($y:ident , * $x:ident) = $v:expr } => {
-        let ($y,$x) = tuplet!($v ; 1 ; () ; ($v.get(0)) ); };
-    { ($y:ident $(, $x:ident)* , * $z:ident) = $v:expr } => {
-        let ($y,$($x),*, $z) = tuplet!($v ; 1 ; ($($x),*) ; ($v.get(0)) ); };
-    { $v:expr ; $j:expr ; ($y:ident $(, $x:ident)*) ; ($($a:expr),*)  } => {
-        tuplet!( $v ; $j+1 ; ($($x),*) ; ($($a),*,$v.get($j)) ) };
-    { $v:expr ; $j:expr ; () ; ($($a:expr),*) } => {
-        {
-            if $v.len() >= $j {
-                let remain = $v.len() - $j;
-                if remain > 0 {
-                    ($($a),*, Some(&$v[$j..]))
-                } else {
-                    ($($a),*, None)
-                }
-            } else {
-                ($($a),*, None)
-            }
-        }
-    }
-}
-
-#[macro_export]
 macro_rules! define_comparison {
     ($proc:ident, $name:pat, $func:expr) => {
         let $proc = DataType::Proc(Function( Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
@@ -88,7 +62,8 @@ macro_rules! define_comparison {
                 if vec.len() != 2 {
                     return Err("function requires 2 arguments only".into());
                 }
-                tuplet!((a,b) = vec);
+                let a = vec.get(0);
+                let b = vec.get(1);
 
                 if let (Some(&DataType::Number(ref a0)), Some(&DataType::Number(ref b0))) = (a, b) {
                     let a1: f64 = a0.clone().into();
@@ -385,13 +360,16 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                 return Err("syntax error".into());
             }
 
-            tuplet!((s0,s1,s2,s3) = list);
+            let s0 = list.get(0);
+            let s1 = list.get(1);
+            let s2 = list.get(2);
+            let s3 = list.get(3);
 
             if let Some(&AST::Symbol(ref s0)) = s0 {
                 match s0.as_str() {
                     "quote" => {
                         debug!("quote-expression");
-                        tuplet!((s0_option,s1_option,*rest_option) = list);
+                        let s1_option = list.get(1);
 
                         match s1_option {
                             Some(ref ast) => {
@@ -569,7 +547,8 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                 debug!("first ast is not a symbol");
                 debug!("proc_key : {:?}", s0);
 
-                tuplet!((s0_option,*rest_option) = list);
+                let s0_option = list.get(0);
+                let rest_option = if list.len() > 1 { Some(&list[1..]) } else { None };
 
                 if let Some(&AST::Children(_)) = s0_option {
                     match eval(Some(list.first().unwrap().clone()), env.clone()) {
@@ -823,7 +802,8 @@ pub fn setup() -> HashMap<String, DataType> {
         }
 
         //        let first_option = vec.first();
-        tuplet!((first_option,*rest_option) = vec);
+        let first_option = vec.get(0);
+        let rest_option = if vec.len() > 1 { Some(&vec[1..]) } else { None };
 
         match first_option {
             Some(&DataType::List(ref l1)) => {
@@ -913,7 +893,8 @@ pub fn setup() -> HashMap<String, DataType> {
             return Err("apply function requires two arguments".into());
         }
 
-        tuplet!((s0,s1) = vec);
+        let s0 = vec.get(0);
+        let s1 = vec.get(1);
         if let Some(&DataType::List(ref args)) = s1 {
             match s0 {
                 Some(&DataType::Proc(ref f)) => {

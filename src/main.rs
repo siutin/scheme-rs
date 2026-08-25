@@ -26,7 +26,7 @@ fn main() {
 
     debug!("args_ref: {:?}", args_ref);
 
-    tuplet!((_program_name_option, arg_1st_option, *_rest) = args_ref);
+    let arg_1st_option = args_ref.get(1);
 
     match arg_1st_option {
         Some(&"-h") | Some(&"-H") | Some(&"--help") => display_help(),
