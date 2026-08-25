@@ -264,8 +264,46 @@
 
 ---
 
+## Phase 8: Numeric Tower — i64/f64 Split (`numeric`)
+
+> **Spec**: `projects/SPEC_NUMERIC.md`
+
+- [ ] **Task 30: Split `DataType::Number` into `Integer`/`Float`**
+  - Acceptance: `DataType` has `Integer(i64)` and `Float(f64)` instead of `Number(f64)`. `PartialEq` handles cross-type numeric equality (`Integer(42) == Float(42.0)` is true).
+  - Verify: `cargo build` succeeds (may have errors in other files, that's OK — fixed in Tasks 31-33)
+  - Files: `src/types.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 31: Update `eval.rs` for Integer/Float**
+  - Acceptance: `define` handles `AST::Integer` → `DataType::Integer`, `AST::Float` → `DataType::Float`. `ast2datatype` updated. All literal handling uses new variants.
+  - Verify: `cargo build` succeeds (builtins may still have errors)
+  - Files: `src/eval.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 32: Update `builtins.rs` with promotion rules**
+  - Acceptance: Arithmetic uses integer arithmetic when both operands are integers, promotes to float when mixed. `/` always returns Float. `modulo`/`quotient`/`remainder` return Integer. Comparisons work across types. Predicates (`zero?`, `positive?`, etc.) work on both types.
+  - Verify: `cargo build` succeeds, `cargo test` passes
+  - Files: `src/builtins.rs`
+  - Status: `[ ]`
+
+- [ ] **Task 33: Update tests for Integer/Float**
+  - Acceptance: Existing tests updated to expect `Integer(...)` or `Float(...)` instead of `Number(...)`. New tests for: integer preservation, mixed-type promotion, division returns float, numeric equality vs type equality.
+  - Verify: All tests pass, new tests cover promotion rules
+  - Files: `tests/spec.rs`
+  - Status: `[ ]`
+
+### Checkpoint: Numeric Tower
+- [ ] `42` evaluates to `Integer(42)`, not `Float(42.0)`
+- [ ] `(+ 1 2)` → `Integer(3)`, `(+ 1 2.0)` → `Float(3.0)`
+- [ ] `(/ 6 2)` → `Float(3.0)`
+- [ ] `(= 1 1.0)` → `#t`, `(eqv? 1 1.0)` → `#f`
+- [ ] All tests pass
+- [ ] Zero compiler warnings
+
+---
+
 ## Known Issues (Deferred — Not in This Round)
 
-- [ ] **Integer precision loss**: All numbers are `f64`. `i64` is cast to `f64` at eval time. Fix requires a numeric tower (BigInt or at least i64/f64 distinction).
 - [ ] **5 unpushed commits on master**: Should push before merging this branch back.
 - [ ] **Advanced R5RS features deferred**: `quasiquote`/`unquote`, `do` loops, named `let`, macros (`define-syntax`/`syntax-rules`), `call/cc`.
+- [ ] **No BigInt support**: Integers are i64 only. Arbitrary precision would require num-bigint dependency.
