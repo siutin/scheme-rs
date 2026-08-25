@@ -141,6 +141,18 @@ fn unary_minus_test() {
 }
 
 #[test]
+fn division_by_zero_test() {
+    assert_eq!(Err(SchemeError::DivisionByZero), run("(/ 1 0)").value);
+    assert_eq!(Err(SchemeError::DivisionByZero), run("(/ 10 2 0)").value);
+    assert_eq!(Err(SchemeError::DivisionByZero), run("(/ 100 0 5)").value);
+    // Unary division should work: (/ 5) = 1/5 = 0.2
+    assert_eq!(Ok(Some(DataType::Number(0.2))), run("(/ 5)").value);
+    // Normal division still works
+    assert_eq!(Ok(Some(DataType::Number(5.0))), run("(/ 10 2)").value);
+    assert_eq!(Ok(Some(DataType::Number(2.0))), run("(/ 12 3 2)").value);
+}
+
+#[test]
 fn tricky_test1 () {
 
     // Testing the case that the 1st element is a children and it returns a function/lambda after an evaluation

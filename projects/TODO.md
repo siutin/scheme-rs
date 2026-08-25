@@ -52,11 +52,11 @@
   - Files: `src/lib.rs` (or `parser.rs`), `tests/spec.rs`
   - Status: `[x]` done
 
-- [ ] **Task 6: Fix division by zero**
+- [x] **Task 6: Fix division by zero**
   - Acceptance: `(/ 1 0)` returns `Err(SchemeError::DivisionByZero)`, not `inf`
-  - Verify: New test `division_by_zero_test` passes, all existing tests pass
+  - Verify: New test `division_by_zero_test` passes, all 33 tests pass
   - Files: `src/lib.rs` (or `builtins.rs`), `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 - [ ] **Task 7: Replace `panic!()`/`unreachable!()` with `SchemeError`**
   - Acceptance: No `panic!()` or `unreachable!()` in code paths reachable from user input. All replaced with `Err(SchemeError::...)`.

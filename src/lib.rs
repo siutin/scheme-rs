@@ -742,23 +742,25 @@ pub fn setup() -> HashMap<String, DataType> {
             return Err("wrong argument datatype".into());
         }
 
-        let desc = vec.iter().map(|&ref x|
-            match x {
-                &DataType::Number(f) => f.to_string(),
-                _ => unreachable!(),
-            }
-        ).collect::<Vec<String>>().join(" / ");
-        debug!("Description: {}", desc);
+        if vec.is_empty() {
+            return Err("/ function requires at least one argument".into());
+        }
 
-        let value: f64 = vec.iter().filter_map(|&ref x| { if let &DataType::Number(ref y) = x { Some(y.clone()) } else { None } })
-            .map(|x| {
-                let y: f64 = x.clone().into();
-                y
-            })
-            .fold(0.0, |mut acc, x| {
-                if acc == 0.0 { acc = x; } else { acc = acc / x; }
-                acc
-            });
+        let numbers: Vec<f64> = vec.iter().filter_map(|&ref x| { if let &DataType::Number(ref y) = x { Some(y.clone()) } else { None } })
+            .map(|x| x.into())
+            .collect();
+
+        // Check for division by zero in any divisor
+        if numbers.len() > 1 && numbers[1..].iter().any(|&x| x == 0.0) {
+            return Err(SchemeError::DivisionByZero);
+        }
+
+        let value: f64 = if numbers.len() == 1 {
+            1.0 / numbers[0]
+        } else {
+            let first = numbers[0];
+            numbers[1..].iter().fold(first, |acc, x| acc / x)
+        };
         Ok(Some(DataType::Number(value)))
     }))));
 
