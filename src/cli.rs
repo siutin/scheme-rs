@@ -1,13 +1,8 @@
-extern crate scheme_rs;
-
-#[macro_use]
-extern crate log;
-extern crate env_logger;
-
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::io;
 use std::io::Write;
+use log::debug;
 use scheme_rs::*;
 
 fn main() {

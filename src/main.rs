@@ -1,9 +1,3 @@
-extern crate scheme_rs;
-
-#[macro_use]
-extern crate log;
-extern crate env_logger;
-
 use std::cell::RefCell;
 use std::env;
 use std::fs::File;
@@ -12,6 +6,7 @@ use std::io::prelude::*;
 use std::io::Write;
 use std::path::Path;
 use std::rc::Rc;
+use log::debug;
 use scheme_rs::*;
 
 fn main() {
@@ -31,7 +26,7 @@ fn main() {
 
     debug!("args_ref: {:?}", args_ref);
 
-    tuplet!((_program_name_option, arg_1st_option, *_rest) = args_ref);
+    let arg_1st_option = args_ref.get(1);
 
     match arg_1st_option {
         Some(&"-h") | Some(&"-H") | Some(&"--help") => display_help(),
