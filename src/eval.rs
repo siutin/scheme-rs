@@ -12,7 +12,7 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
     loop {
     debug!("eval");
     debug!("{:?}", ast_option);
-    match ast_option.clone() {
+    match ast_option.take() {
         Some(AST::Symbol(s)) => {
             debug!("ast is a symbol: {:?}", s);
             if s.starts_with("#") {
@@ -170,7 +170,7 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
 
                             debug!("procedure_env: {:?}", procedure_env);
                             let procedure = Procedure {
-                                body: body_ast.clone(),
+                                body: Rc::new(body_ast.clone()),
                                 params: args_meta,
                                 env: Rc::new(RefCell::new(procedure_env))
                             };
@@ -364,30 +364,25 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                     _ => {
                         debug!("Some(AST::Symbol) but not define");
                         debug!("proc_key : {}", s0);
-                        debug!("ENV: {:?}", env);
 
-                        let mut data_option = match env.borrow().get(s0) {
-                            Some(d) => Some(d.clone()),
-                            None => None
-                        };
-
-                        debug!("data_option: {:?}", data_option);
-
-                        match data_option {
+                        // get() returns owned DataType, no extra clone needed
+                        let lookup = env.borrow().get(s0);
+                        match lookup {
                             Some(DataType::Proc(ref f)) => {
                                 let slice = &list[1..list.len()];
                                 return execute(f, slice, env);
                             }
-                            Some(DataType::Lambda(ref mut p)) => {
-                                debug!("first elm symbol - lambda: {:?}", p);
+                            Some(DataType::Lambda(p)) => {
+                                // Move out of p — body is Rc<AST>, cheap clone
                                 let slice = &list[1..list.len()];
+                                let body = p.body.clone();
+                                let params = p.params;
+                                let proc_env_ref = p.env;
                                 match prepare_arguments(slice, env.clone()) {
                                     Ok(args) => {
-                                        debug!("first elm symbol - procedure params: {:?}", p.params);
                                         let procedure_local = Box::new(RefCell::new(HashMap::new()));
 
-                                        for (name_ref, value_ref) in p.params.iter().zip(args.into_iter()) {
-                                            debug!("first elm symbol - procedure params - name: {:?} value: {:?}", name_ref, value_ref);
+                                        for (name_ref, value_ref) in params.iter().zip(args.into_iter()) {
                                             if let (Some(&DataType::Symbol(ref name)), Some(ref value)) = (Some(name_ref), Some(value_ref)) {
                                                 procedure_local.borrow_mut().insert(name.to_string(), value.clone());
                                             } else {
@@ -397,12 +392,11 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
 
                                         let proc_env = Env {
                                             local: procedure_local,
-                                            parent: Some(Box::new(p.env.clone()))
+                                            parent: Some(Box::new(proc_env_ref))
                                         };
 
-                                        debug!("proc_env: {:?}", proc_env);
                                         // TAIL: reassign and continue
-                                        ast_option = Some(p.body.clone());
+                                        ast_option = Some((*body).clone());
                                         env = Rc::new(RefCell::new(proc_env));
                                         continue;
                                     }
@@ -429,15 +423,13 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                                 None => execute(f, &vec![], env)
                             };
                         }
-                        Ok(Some(DataType::Lambda(ref mut p))) => {
-                            debug!("first elm lambda - lambda: {:?} - procedure params: {:?}", p, p.params);
+                        Ok(Some(DataType::Lambda(p))) => {
                             let proc_env = match rest_option {
                                 Some(rest) => {
                                     match prepare_arguments(rest, env.clone()) {
                                         Ok(args) => {
                                             let procedure_local = Box::new(RefCell::new(HashMap::new()));
                                             for (name_ref, value_ref) in p.params.iter().zip(args.into_iter()) {
-                                                debug!("first elm lambda - procedure params - name: {:?} value: {:?}", name_ref, value_ref);
                                                 if let (Some(&DataType::Symbol(ref name)), Some(ref value)) = (Some(name_ref), Some(value_ref)) {
                                                     procedure_local.borrow_mut().insert(name.to_string(), value.clone());
                                                 } else {
@@ -459,9 +451,8 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                                     }
                                 }
                             };
-                            debug!("proc_env: {:?}", proc_env);
                             // TAIL: reassign and continue
-                            ast_option = Some(p.body.clone());
+                            ast_option = Some((*p.body).clone());
                             env = Rc::new(RefCell::new(proc_env));
                             continue;
                         }
@@ -473,16 +464,9 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                 }
             }
         }
-        Some(_) | None => {
-            debug!("ast is not a symbol/children");
-            let data = match ast_option {
-                Some(AST::Integer(i)) => Some(DataType::Integer(i)),
-                Some(AST::Float(f)) => Some(DataType::Float(f)),
-                Some(_) => return Err(SchemeError::RuntimeError("internal error: unexpected state".into())),
-                None => None
-            };
-            return Ok(data);
-        }
+        Some(AST::Integer(i)) => return Ok(Some(DataType::Integer(i))),
+        Some(AST::Float(f)) => return Ok(Some(DataType::Float(f))),
+        None => return Ok(None),
     }
     } // end loop
 }

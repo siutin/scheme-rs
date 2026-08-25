@@ -24,7 +24,7 @@ pub struct ReadFromTokenResult {
 #[derive(Clone)]
 #[derive(PartialEq)]
 pub struct Procedure {
-    pub body: AST,
+    pub body: Rc<AST>,
     pub params: Vec<DataType>,
     pub env: Rc<RefCell<Env>>
 }

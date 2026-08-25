@@ -303,7 +303,7 @@ pub fn setup() -> HashMap<String, DataType> {
                     };
 
                     debug!("proc_env: {:?}", proc_env);
-                    return eval(Some(p.body.clone()), Rc::new(RefCell::new(proc_env)));
+                    return eval(Some((*p.body).clone()), Rc::new(RefCell::new(proc_env)));
                 }
                 Some(_) | None => Err("apply function unknown first argument type".into())
             }
@@ -475,7 +475,7 @@ pub fn setup() -> HashMap<String, DataType> {
                         };
 
                         debug!("proc_env: {:?}", proc_env);
-                        eval(Some(p.body.clone()), Rc::new(RefCell::new(proc_env)))
+                        eval(Some((*p.body).clone()), Rc::new(RefCell::new(proc_env)))
                     }).flat_map(|x| x.ok())
                         .filter(|x| x.is_some())
                         .flat_map(|x| x)
