@@ -74,11 +74,11 @@
 
 ## Phase 3: Module Split (`modules`)
 
-- [ ] **Task 8: Extract `types.rs`**
+- [x] **Task 8: Extract `types.rs`**
   - Acceptance: `AST`, `DataType`, `Procedure`, `Function`, `Env` struct/enum definitions live in `src/types.rs`. `lib.rs` imports from `types`.
   - Verify: `cargo build` succeeds, `cargo test` passes (30+)
   - Files: `src/types.rs` (new), `src/lib.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 - [ ] **Task 9: Extract `error.rs`**
   - Acceptance: `SchemeError` enum lives in `src/error.rs`. `lib.rs` imports from `error`.
