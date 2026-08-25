@@ -404,6 +404,16 @@ fn numeric_equality_test() {
 }
 
 #[test]
+fn null_pred_test() {
+    // null? on empty list
+    assert_eq!(Ok(Some(DataType::Bool(true))), run("(null? (quote ()))").value);
+    // null? on non-empty list
+    assert_eq!(Ok(Some(DataType::Bool(false))), run("(null? (list 1))").value);
+    // null? on non-list
+    assert_eq!(Ok(Some(DataType::Bool(false))), run("(null? 42)").value);
+}
+
+#[test]
 fn tricky_test1 () {
 
     // Testing the case that the 1st element is a children and it returns a function/lambda after an evaluation

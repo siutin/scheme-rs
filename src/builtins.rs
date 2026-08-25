@@ -426,6 +426,14 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
+    map.insert("null?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("null? requires 1 argument".into()); }
+        match vec.get(0) {
+            Some(&DataType::List(ref v)) if v.is_empty() => Ok(Some(DataType::Bool(true))),
+            _ => Ok(Some(DataType::Bool(false))),
+        }
+    }))));
+
     map.insert("map".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, env: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "map", vec);
         if vec.len() != 2 {

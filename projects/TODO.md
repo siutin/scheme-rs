@@ -316,11 +316,11 @@
 
 ### Missing Builtins
 
-- [ ] **Task 35: Add `null?` builtin**
+- [x] **Task 35: Add `null?` builtin**
   - Acceptance: `(null? '())` → `#t`, `(null? (list 1))` → `#f`. Needed for list operations in examples.
-  - Verify: New test `null_pred_test` passes, all 51 existing tests pass
+  - Verify: New test `null_pred_test` passes, all 52 tests pass
   - Files: `src/builtins.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 ### Benchmarks
 
