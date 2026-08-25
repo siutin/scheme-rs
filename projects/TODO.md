@@ -304,6 +304,5 @@
 
 ## Known Issues (Deferred — Not in This Round)
 
-- [ ] **5 unpushed commits on master**: Should push before merging this branch back.
 - [ ] **Advanced R5RS features deferred**: `quasiquote`/`unquote`, `do` loops, named `let`, macros (`define-syntax`/`syntax-rules`), `call/cc`.
 - [ ] **No BigInt support**: Integers are i64 only. Arbitrary precision would require num-bigint dependency.
