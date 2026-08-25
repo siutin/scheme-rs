@@ -7,9 +7,8 @@
     (lambda ()
       (let ((count 0))
         (lambda ()
-          (begin
-            (set! count (+ count 1))
-            count)))))
+          (set! count (+ count 1))
+          count))))
 
   (define c1 (make-counter))
   (define c2 (make-counter))
@@ -31,9 +30,8 @@
     (lambda (init)
       (let ((total init))
         (lambda (n)
-          (begin
-            (set! total (+ total n))
-            total)))))
+          (set! total (+ total n))
+          total))))
 
   (define acc (make-accumulator 100))
   (display "accumulator: ")

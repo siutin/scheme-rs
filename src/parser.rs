@@ -36,11 +36,15 @@ fn tokenize(program: &str) -> Vec<String>
         .join("\n");
 
     // Tokenize: split on whitespace and parens, but keep strings intact
+    // Also handle quasiquote (`), unquote (,), unquote-splicing (,@) as separate tokens
     let mut tokens: Vec<String> = Vec::new();
     let mut current = String::new();
     let mut in_string = false;
+    let chars: Vec<char> = stripped.chars().collect();
+    let mut i = 0;
 
-    for c in stripped.chars() {
+    while i < chars.len() {
+        let c = chars[i];
         if in_string {
             current.push(c);
             if c == '"' {
@@ -48,6 +52,7 @@ fn tokenize(program: &str) -> Vec<String>
                 current.clear();
                 in_string = false;
             }
+            i += 1;
         } else if c == '"' {
             if !current.is_empty() {
                 tokens.push(current.clone());
@@ -55,19 +60,43 @@ fn tokenize(program: &str) -> Vec<String>
             }
             current.push(c);
             in_string = true;
+            i += 1;
         } else if c == '(' || c == ')' {
             if !current.is_empty() {
                 tokens.push(current.clone());
                 current.clear();
             }
             tokens.push(c.to_string());
+            i += 1;
+        } else if c == '`' {
+            if !current.is_empty() {
+                tokens.push(current.clone());
+                current.clear();
+            }
+            tokens.push("`".to_string());
+            i += 1;
+        } else if c == ',' {
+            if !current.is_empty() {
+                tokens.push(current.clone());
+                current.clear();
+            }
+            // Check for ,@ (unquote-splicing)
+            if i + 1 < chars.len() && chars[i + 1] == '@' {
+                tokens.push(",@".to_string());
+                i += 2;
+            } else {
+                tokens.push(",".to_string());
+                i += 1;
+            }
         } else if c.is_whitespace() {
             if !current.is_empty() {
                 tokens.push(current.clone());
                 current.clear();
             }
+            i += 1;
         } else {
             current.push(c);
+            i += 1;
         }
     }
     if !current.is_empty() {
@@ -151,6 +180,54 @@ fn read_from_tokens(mut tokens: Vec<String>) -> Result<ReadFromTokenResult, Sche
                         ReadFromTokenResult {
                             remain: data.remain,
                             result: AST::Children(vec![AST::Symbol("quote".to_string()), data.result])
+                        }
+                    )
+                }
+                Err(e) => Err(e)
+            }
+        } else if token == "`" {
+            // Quasiquote shorthand: read the next form and wrap in (quasiquote <form>)
+            if tokens.is_empty() {
+                return Err("unexpected EOF after quasiquote".into());
+            }
+            match read_from_tokens(tokens) {
+                Ok(data) => {
+                    Ok(
+                        ReadFromTokenResult {
+                            remain: data.remain,
+                            result: AST::Children(vec![AST::Symbol("quasiquote".to_string()), data.result])
+                        }
+                    )
+                }
+                Err(e) => Err(e)
+            }
+        } else if token == "," {
+            // Unquote shorthand: read the next form and wrap in (unquote <form>)
+            if tokens.is_empty() {
+                return Err("unexpected EOF after unquote".into());
+            }
+            match read_from_tokens(tokens) {
+                Ok(data) => {
+                    Ok(
+                        ReadFromTokenResult {
+                            remain: data.remain,
+                            result: AST::Children(vec![AST::Symbol("unquote".to_string()), data.result])
+                        }
+                    )
+                }
+                Err(e) => Err(e)
+            }
+        } else if token == ",@" {
+            // Unquote-splicing shorthand: read the next form and wrap in (unquote-splicing <form>)
+            if tokens.is_empty() {
+                return Err("unexpected EOF after unquote-splicing".into());
+            }
+            match read_from_tokens(tokens) {
+                Ok(data) => {
+                    Ok(
+                        ReadFromTokenResult {
+                            remain: data.remain,
+                            result: AST::Children(vec![AST::Symbol("unquote-splicing".to_string()), data.result])
                         }
                     )
                 }

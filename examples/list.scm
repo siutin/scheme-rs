@@ -1,4 +1,4 @@
-;; List operations — map, filter, reduce
+;; List operations — map, filter, reduce, named let, quasiquote
 (begin
   (print "list operations example")
 
@@ -40,4 +40,19 @@
   ;; evens via filter
   (display "evens: ")
   (display (filter even? nums))
+  (newline)
+
+  ;; named let — factorial using loop
+  (display "factorial 5: ")
+  (display
+    (let loop ((i 1) (acc 1))
+      (if (> i 5)
+        acc
+        (loop (+ i 1) (* acc i)))))
+  (newline)
+
+  ;; quasiquote — build list with unquote
+  (define x 42)
+  (display "quasiquote: ")
+  (display `(the answer is ,x))
   (newline))

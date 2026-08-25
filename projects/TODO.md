@@ -356,8 +356,6 @@
 - [ ] **Macros deferred**: `define-syntax`/`syntax-rules` — complex, needs a full macro expander.
 - [ ] **`call/cc` deferred**: Needs continuation support — major architectural change.
 - [ ] **No BigInt support**: Integers are i64 only. Arbitrary precision would require num-bigint dependency.
-- [ ] **Multi-expression lambda/let bodies require explicit `begin`**: Should evaluate all body expressions in sequence, returning the last.
-- [ ] **Internal `define` in lambda bodies doesn't work**: Related to multi-expression body issue.
 
 ---
 
@@ -381,36 +379,36 @@
 
 ### R5RS Features
 
-- [ ] **Task 40: quasiquote / unquote / unquote-splicing**
+- [x] **Task 40: quasiquote / unquote / unquote-splicing**
   - Acceptance: `` `(1 2 ,(+ 1 2)) `` → `(1 2 3)`. `` `(1 ,@(list 2 3) 4) `` → `(1 2 3 4)`. Parser handles `` ` ``, `,`, `,@` shorthands.
   - Verify: New test `quasiquote_test` passes
   - Files: `src/parser.rs`, `src/eval.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
-- [ ] **Task 41: Named let**
+- [x] **Task 41: Named let**
   - Acceptance: `(let loop ((i 0)) (if (= i 5) 'done (loop (+ i 1))))` → `done`. Creates a recursive procedure and calls it immediately.
   - Verify: New test `named_let_test` passes
   - Files: `src/eval.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
-- [ ] **Task 42: do loops**
+- [x] **Task 42: do loops**
   - Acceptance: `(do ((i 0 (+ i 1))) ((= i 5) i))` → `5`. Supports var init step, test result, body.
   - Verify: New test `do_loop_test` passes
   - Files: `src/eval.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
-- [ ] **Task 43: Update examples to remove begin workarounds**
-  - Acceptance: `closures.scm` uses multi-expression bodies instead of explicit `begin`. Examples use quasiquote where appropriate.
-  - Verify: All examples still run correctly
+- [x] **Task 43: Update examples to remove begin workarounds**
+  - Acceptance: `closures.scm` uses multi-expression bodies instead of explicit `begin`. `list.scm` uses named let and quasiquote.
+  - Verify: All 5 examples run correctly
   - Files: `examples/closures.scm`, `examples/list.scm`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 ### Checkpoint: Bug Fixes + R5RS Features
-- [ ] Multi-expression bodies work in lambda, let, when, unless
-- [ ] Internal define works in lambda bodies
-- [ ] quasiquote/unquote/unquote-splicing work
-- [ ] Named let works
-- [ ] do loops work
-- [ ] Examples updated, no begin workarounds
-- [ ] All tests pass
-- [ ] Zero compiler warnings
+- [x] Multi-expression bodies work in lambda, let, when, unless
+- [x] Internal define works in lambda bodies
+- [x] quasiquote/unquote/unquote-splicing work
+- [x] Named let works
+- [x] do loops work
+- [x] Examples updated, no begin workarounds
+- [x] All 57 tests pass
+- [x] Zero compiler warnings

@@ -67,6 +67,14 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                             None => { return Err("wrong number of parts".into()); }
                         }
                     }
+                    "quasiquote" => {
+                        // (quasiquote template) — evaluate unquote/unquote-splicing inside
+                        if let Some(template) = list.get(1) {
+                            return Ok(Some(eval_quasiquote(template, env.clone())?));
+                        } else {
+                            return Err("quasiquote requires a template".into());
+                        }
+                    }
                     "if" => {
                         debug!("if-expression");
                         if let (Some(&ref cond), Some(&ref conseq), Some(&ref alt)) = (s1, s2, s3) {
@@ -193,7 +201,76 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                         }
                     }
                     "let" => {
-                        // (let ((var init) ...) body...)
+                        // Named let: (let name ((var init) ...) body...)
+                        if let Some(&AST::Symbol(ref name)) = s1 {
+                            // Second element must be bindings
+                            if let Some(&AST::Children(ref bindings)) = s2 {
+                                let body_exprs = &list[3..];
+                                if body_exprs.is_empty() {
+                                    return Err("named let requires a body".into());
+                                }
+                                // Extract param names and initial values
+                                let mut params: Vec<DataType> = Vec::new();
+                                let mut init_vals: Vec<DataType> = Vec::new();
+                                for binding in bindings.iter() {
+                                    if let AST::Children(ref pair) = binding {
+                                        if let (Some(&AST::Symbol(ref pname)), Some(init)) = (pair.get(0), pair.get(1)) {
+                                            params.push(DataType::Symbol(pname.clone()));
+                                            match eval(Some(init.clone()), env.clone())? {
+                                                Some(val) => init_vals.push(val),
+                                                None => init_vals.push(DataType::Bool(false)),
+                                            }
+                                        } else {
+                                            return Err("named let binding must be (name init)".into());
+                                        }
+                                    } else {
+                                        return Err("named let bindings must be (name init) pairs".into());
+                                    }
+                                }
+                                // Build body as implicit begin
+                                let body_ast = if body_exprs.len() == 1 {
+                                    body_exprs[0].clone()
+                                } else {
+                                    AST::Children(
+                                        std::iter::once(AST::Symbol("begin".to_string()))
+                                            .chain(body_exprs.iter().cloned())
+                                            .collect()
+                                    )
+                                };
+                                // Create the recursive procedure
+                                // The proc env must contain a binding for `name` pointing to itself
+                                let proc_env = Env {
+                                    local: Box::new(RefCell::new(HashMap::new())),
+                                    parent: Some(Box::new(env.clone())),
+                                };
+                                let proc_env_rc = Rc::new(RefCell::new(proc_env));
+                                let procedure = Procedure {
+                                    body: Rc::new(body_ast),
+                                    params,
+                                    env: proc_env_rc.clone(),
+                                };
+                                // Bind name to procedure in its own env (for recursion)
+                                proc_env_rc.borrow_mut().local.borrow_mut().insert(name.clone(), DataType::Lambda(procedure.clone()));
+                                // Now call the procedure with init_vals
+                                let call_env = Env {
+                                    local: Box::new(RefCell::new(HashMap::new())),
+                                    parent: Some(Box::new(proc_env_rc.clone())),
+                                };
+                                for (param, val) in procedure.params.iter().zip(init_vals.into_iter()) {
+                                    if let DataType::Symbol(ref pname) = param {
+                                        call_env.local.borrow_mut().insert(pname.clone(), val);
+                                    }
+                                }
+                                let call_env_rc = Rc::new(RefCell::new(call_env));
+                                // TAIL: evaluate the body in the call env
+                                ast_option = Some((*procedure.body).clone());
+                                env = call_env_rc;
+                                continue;
+                            } else {
+                                return Err("named let requires bindings".into());
+                            }
+                        }
+                        // Regular let: (let ((var init) ...) body...)
                         if let (Some(&AST::Children(ref bindings)), Some(_)) = (s1, s2) {
                             let body_exprs = &list[2..];
                             if body_exprs.is_empty() {
@@ -275,6 +352,110 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                             Some(expr) => { ast_option = Some(expr); continue; }
                             None => return Ok(Some(DataType::Bool(false))),
                         }
+                    }
+                    "do" => {
+                        // (do ((var init step) ...) (test result ...) body ...)
+                        let bindings = list.get(1);
+                        let test_clause = list.get(2);
+                        let body_exprs = &list[3..];
+
+                        // Parse bindings: (var init step?) pairs
+                        let mut var_names: Vec<String> = Vec::new();
+                        let mut var_vals: Vec<DataType> = Vec::new();
+                        let mut var_steps: Vec<Option<AST>> = Vec::new();
+
+                        if let Some(&AST::Children(ref binds)) = bindings {
+                            for binding in binds.iter() {
+                                if let AST::Children(ref parts) = binding {
+                                    if let Some(&AST::Symbol(ref name)) = parts.get(0) {
+                                        var_names.push(name.clone());
+                                        // init
+                                        if let Some(init) = parts.get(1) {
+                                            match eval(Some(init.clone()), env.clone())? {
+                                                Some(val) => var_vals.push(val),
+                                                None => var_vals.push(DataType::Bool(false)),
+                                            }
+                                        } else {
+                                            var_vals.push(DataType::Bool(false));
+                                        }
+                                        // step (optional)
+                                        var_steps.push(parts.get(2).cloned());
+                                    } else {
+                                        return Err("do binding must start with a symbol".into());
+                                    }
+                                } else {
+                                    return Err("do bindings must be (var init step?)".into());
+                                }
+                            }
+                        } else {
+                            return Err("do requires bindings".into());
+                        }
+
+                        // Parse test clause: (test result ...)
+                        let (test_ast, result_exprs) = if let Some(&AST::Children(ref tc)) = test_clause {
+                            let test = tc.get(0).cloned();
+                            let results = tc[1..].to_vec();
+                            (test, results)
+                        } else {
+                            return Err("do requires a test clause".into());
+                        };
+
+                        // Main loop
+                        loop {
+                            // Create do env with current var values
+                            let mut do_local = HashMap::new();
+                            for (name, val) in var_names.iter().zip(var_vals.iter()) {
+                                do_local.insert(name.clone(), val.clone());
+                            }
+                            let do_env = Env {
+                                local: Box::new(RefCell::new(do_local)),
+                                parent: Some(Box::new(env.clone())),
+                            };
+                            let do_env_rc = Rc::new(RefCell::new(do_env));
+
+                            // Evaluate test
+                            let test_result = match test_ast {
+                                Some(ref t) => eval(Some(t.clone()), do_env_rc.clone())?,
+                                None => Some(DataType::Bool(false)),
+                            };
+
+                            if let Some(DataType::Bool(true)) = test_result {
+                                // Test passed — evaluate result expressions
+                                if result_exprs.is_empty() {
+                                    return Ok(None);
+                                }
+                                // Evaluate all but last for side effects, return last
+                                for expr in &result_exprs[..result_exprs.len() - 1] {
+                                    eval(Some(expr.clone()), do_env_rc.clone())?;
+                                }
+                                // TAIL: last result expression
+                                ast_option = Some(result_exprs[result_exprs.len() - 1].clone());
+                                env = do_env_rc;
+                                // Break out of do loop, continue eval loop
+                                break;
+                            }
+
+                            // Evaluate body expressions for side effects
+                            for expr in body_exprs {
+                                eval(Some(expr.clone()), do_env_rc.clone())?;
+                            }
+
+                            // Compute step values
+                            let mut new_vals: Vec<DataType> = Vec::new();
+                            for (i, step) in var_steps.iter().enumerate() {
+                                if let Some(ref step_ast) = step {
+                                    match eval(Some(step_ast.clone()), do_env_rc.clone())? {
+                                        Some(val) => new_vals.push(val),
+                                        None => new_vals.push(var_vals[i].clone()),
+                                    }
+                                } else {
+                                    // No step — keep current value
+                                    new_vals.push(var_vals[i].clone());
+                                }
+                            }
+                            var_vals = new_vals;
+                        }
+                        continue;
                     }
                     "set!" => {
                         // (set! var expr) — mutate existing binding
@@ -597,5 +778,74 @@ fn ast2datatype(value: &AST) -> Result<DataType, SchemeError> {
         }
         &AST::Integer(i) => Ok(DataType::Integer(i)),
         &AST::Float(f) => Ok(DataType::Float(f))
+    }
+}
+
+/// Evaluate a quasiquote template — recursively walk the AST, evaluating
+/// unquote forms and splicing unquote-splicing forms into lists.
+fn eval_quasiquote(template: &AST, env: Rc<RefCell<Env>>) -> Result<DataType, SchemeError> {
+    match template {
+        // (unquote expr) — evaluate expr
+        &AST::Children(ref v) if v.len() == 2 => {
+            if let Some(&AST::Symbol(ref s)) = v.get(0) {
+                if s == "unquote" {
+                    match eval(Some(v[1].clone()), env)? {
+                        Some(d) => return Ok(d),
+                        None => return Ok(DataType::Bool(false)),
+                    }
+                }
+            }
+            // Not unquote — process each element recursively
+            let mut result: Vec<DataType> = Vec::new();
+            for elem in v.iter() {
+                // Check for unquote-splicing
+                if let AST::Children(ref inner) = elem {
+                    if inner.len() == 2 {
+                        if let Some(&AST::Symbol(ref s)) = inner.get(0) {
+                            if s == "unquote-splicing" {
+                                match eval(Some(inner[1].clone()), env.clone())? {
+                                    Some(DataType::List(splice)) => {
+                                        result.extend(splice);
+                                        continue;
+                                    }
+                                    Some(_) => return Err("unquote-splicing requires a list".into()),
+                                    None => continue,
+                                }
+                            }
+                        }
+                    }
+                }
+                result.push(eval_quasiquote(elem, env.clone())?);
+            }
+            Ok(DataType::List(result))
+        }
+        // Children with len != 2 — process each element recursively
+        &AST::Children(ref v) => {
+            let mut result: Vec<DataType> = Vec::new();
+            for elem in v.iter() {
+                if let AST::Children(ref inner) = elem {
+                    if inner.len() == 2 {
+                        if let Some(&AST::Symbol(ref s)) = inner.get(0) {
+                            if s == "unquote-splicing" {
+                                match eval(Some(inner[1].clone()), env.clone())? {
+                                    Some(DataType::List(splice)) => {
+                                        result.extend(splice);
+                                        continue;
+                                    }
+                                    Some(_) => return Err("unquote-splicing requires a list".into()),
+                                    None => continue,
+                                }
+                            }
+                        }
+                    }
+                }
+                result.push(eval_quasiquote(elem, env.clone())?);
+            }
+            Ok(DataType::List(result))
+        }
+        // Atoms — convert directly
+        &AST::Integer(i) => Ok(DataType::Integer(i)),
+        &AST::Float(f) => Ok(DataType::Float(f)),
+        &AST::Symbol(ref s) => Ok(DataType::Symbol(s.clone())),
     }
 }

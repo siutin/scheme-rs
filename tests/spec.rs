@@ -443,6 +443,59 @@ fn internal_define_test() {
 }
 
 #[test]
+fn named_let_test() {
+    // Basic named let — count to 5
+    assert_eq!(Ok(Some(DataType::Symbol("done".to_string()))),
+        run("(let loop ((i 0)) (if (= i 5) (quote done) (loop (+ i 1))))").value);
+    // Named let with accumulator — sum 1..5
+    assert_eq!(Ok(Some(DataType::Integer(15))),
+        run("(let loop ((i 1) (acc 0)) (if (> i 5) acc (loop (+ i 1) (+ acc i))))").value);
+    // Named let with multi-expression body
+    assert_eq!(Ok(Some(DataType::Integer(10))),
+        run("(let loop ((i 0) (acc 0)) (display i) (if (= i 10) acc (loop (+ i 1) (+ acc 1))))").value);
+}
+
+#[test]
+fn do_loop_test() {
+    // Basic do loop — count to 5
+    assert_eq!(Ok(Some(DataType::Integer(5))),
+        run("(do ((i 0 (+ i 1))) ((= i 5) i))").value);
+    // Do loop with accumulator — sum 1..5
+    assert_eq!(Ok(Some(DataType::Integer(15))),
+        run("(do ((i 1 (+ i 1)) (acc 0 (+ acc i))) ((> i 5) acc))").value);
+    // Do loop with body — side effects + result
+    assert_eq!(Ok(Some(DataType::Integer(10))),
+        run("(do ((i 0 (+ i 1))) ((= i 10) i) (display i))").value);
+    // Do loop with no step (var keeps initial value)
+    assert_eq!(Ok(Some(DataType::Integer(42))),
+        run("(do ((x 42)) (#t x))").value);
+}
+
+#[test]
+fn quasiquote_test() {
+    // Basic quasiquote — literals pass through
+    assert_eq!(Ok(Some(DataType::List(vec![
+        DataType::Integer(1), DataType::Integer(2), DataType::Integer(3)]))),
+        run("`(1 2 3)").value);
+    // Unquote — evaluate inside quasiquote
+    assert_eq!(Ok(Some(DataType::List(vec![
+        DataType::Integer(1), DataType::Integer(2), DataType::Integer(3)]))),
+        run("`(1 2 ,(+ 1 2))").value);
+    // Unquote with variable
+    assert_eq!(Ok(Some(DataType::List(vec![
+        DataType::Integer(10), DataType::Integer(20)]))),
+        run("(let ((x 20)) `(10 ,x))").value);
+    // Unquote-splicing — splice list into template
+    assert_eq!(Ok(Some(DataType::List(vec![
+        DataType::Integer(1), DataType::Integer(2), DataType::Integer(3), DataType::Integer(4)]))),
+        run("`(1 ,@(list 2 3) 4)").value);
+    // Nested quasiquote
+    assert_eq!(Ok(Some(DataType::List(vec![
+        DataType::Integer(1), DataType::List(vec![DataType::Integer(2), DataType::Integer(3)])]))),
+        run("`(1 (2 3))").value);
+}
+
+#[test]
 fn tricky_test1 () {
 
     // Testing the case that the 1st element is a children and it returns a function/lambda after an evaluation
