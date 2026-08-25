@@ -4,13 +4,14 @@
 
 A multi-phase effort to refactor, fix, and extend the scheme-rs Scheme
 interpreter written in Rust. What began as a 3-phase, 14-task modernization
-project grew into 11 phases and 51 tasks, covering code quality, bug fixes,
+project grew into 12 phases and 52 tasks, covering code quality, bug fixes,
 module architecture, R5RS feature implementation, tail-call optimization,
-CI migration, numeric tower improvements, performance optimization, and
-more R5RS features.
+CI migration, numeric tower improvements, performance optimization, more
+R5RS features, and an environment trait abstraction.
 
-**Status**: All 11 phases complete. 65/65 tests pass. Zero compiler warnings.
+**Status**: All 12 phases complete. 65/65 tests pass. Zero compiler warnings.
 ~58% R5RS feature coverage (88 supported, 3 partial, 61 not supported).
+See `projects/FUTURE_PLAN.md` for candidate next phases.
 
 ## Architecture Decisions
 
@@ -34,6 +35,8 @@ more R5RS features.
 
 10. **Named let as self-referencing procedure** — `(let loop ...)` creates a lambda, binds it in its own env for recursion, then calls it with initial values. (Phase 10)
 
+11. **Environment trait abstraction** — Introduce `Environment` trait (`get`/`set`/`define`) + `EnvRef` type alias to decouple the interpreter from `Env`'s concrete representation. Replaces 79 `Rc<RefCell<Env>>` sites and 17 ad-hoc struct literals with centralized constructors. Enables future `InternedEnv` for performance and mock environments for testing. (Phase 12)
+
 ## Phase Summary
 
 | Phase | Name | Tasks | Tests | Key Deliverable |
@@ -49,6 +52,7 @@ more R5RS features.
 | 9 | Examples & Performance | 34-37 | 52 | 5 examples, 6 benchmarks, ~2x speedup |
 | 10 | Bug Fixes + R5RS | 38-43 | 57 | Multi-expr bodies, internal define, quasiquote, named let, do loops |
 | 11 | R5RS Core Gaps | 44-51 | 65 | define shorthand, let*/letrec, and/or, list utils, string utils, math, error |
+| 12 | Environment Trait | 52 | 65 | Environment trait, EnvRef, centralized constructors, decouple Env from interpreter |
 
 ## Detailed Phase List
 
@@ -195,6 +199,19 @@ more R5RS features.
 
 **Checkpoint**: 65 tests pass, ~58% R5RS coverage (was ~43%), zero warnings.
 
+### Phase 12: Environment Trait (`env-trait`) — ✅ Complete
+
+> Spec: `projects/SPEC_ENV_TRAIT.md`
+
+- [x] Task 52: Introduce `Environment` trait + `EnvRef` + centralized constructors
+  - Acceptance: `Environment` trait with `get`/`set`/`define`. `EnvRef = Rc<RefCell<dyn Environment>>`. `Env::new()`/`root()`/`child()`/`child_with()` constructors. Zero `Rc<RefCell<Env>>` outside env.rs. Zero direct `Env { ... }` construction outside env.rs. All 65 tests pass.
+  - Verify: `cargo build` zero warnings, `cargo test` 65/65, `grep -rn "Rc<RefCell<Env>>" src/` returns nothing outside env.rs
+  - Files: `src/env.rs`, `src/eval.rs`, `src/types.rs`, `src/builtins.rs`, `src/cli.rs`, `src/main.rs`, `src/bench.rs`, `tests/spec.rs`, `src/lib.rs`
+  - Status: `[x]` done (commit `78eb9f7`)
+  - Note: This refactor was committed without a formal plan review. The code is sound and this spec is a retroactive document. See `SPEC_ENV_TRAIT.md` for full design rationale.
+
+**Checkpoint**: 65 tests pass, zero warnings, Env decoupled from interpreter. Enables `InternedEnv` (perf) and mock environments (testing) — see `FUTURE_PLAN.md`.
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation | Outcome |
@@ -206,26 +223,28 @@ more R5RS features.
 | Numeric split breaks all existing tests | High | Update tests in same commit, use script for bulk `Number(X.0)` → `Integer(X)` conversion | ✅ Script handled bulk, manual fixes for edge cases |
 | Named let self-reference creates env cycle | Medium | Bind procedure in its own env before calling, use `Rc<RefCell<Env>>` | ✅ Works correctly |
 | `Rc<AST>` change causes clone semantics shift | Low | Only `Procedure.body` uses `Rc`, other AST cloning unchanged | ✅ ~2x speedup, no regressions |
+| Environment trait adds vtable dispatch overhead | Low | Single vtable call per `get`/`set`/`define`, negligible vs string hashing | ✅ No measurable regression |
+| `Procedure::PartialEq` derive was broken (Env has no PartialEq) | Medium | Manual impl using `Rc::ptr_eq` for env comparison | ✅ Fixed in same commit |
 
 ## Deferred Work (Not Planned)
 
-These items are documented in `projects/R5RS_SUPPORT.md` and `projects/TODO.md` but have no tasks, specs, or phases:
+These items are documented in `projects/R5RS_SUPPORT.md`, `projects/TODO.md`,
+and `projects/FUTURE_PLAN.md` but have no tasks, specs, or committed phases:
 
-- **Macros** (`define-syntax` / `syntax-rules`) — needs a full macro expander
-- **`call/cc`** — needs continuation support, major architectural change
-- **BigInt** — integers are i64 only, would need `num-bigint` dependency
-- **Character type** — `#\a` syntax, `char?`, `char->integer`
-- **Vectors** — `#(...)` syntax, vector operations
-- **Transcendental math** — `exp`, `log`, `sin`, `cos`, `tan`, `atan`, `asin`, `acos`
-- **`string->number` / `number->string`** — numeric/string conversion
-- **`integer?` / `real?` / `rational?` / `complex?`** — numeric type predicates
-- **`exact?` / `inexact?`** — exact/inexact distinction
+- **InternedEnv** — interned u32 symbol keys to eliminate string hashing (Phase 13 candidate)
+- **Env trait follow-up** — finish `set!` migration to use `env.borrow().set()` (Phase 12 candidate)
+- **R5RS remaining core** — `for-each`, `cadr`/`cddr` compositions, `string->number`, type predicates, transcendental math (Phase 14 candidate)
+- **Vectors** — `#(...)` syntax, vector operations (Phase 15 candidate)
+- **Character type** — `#\a` syntax, `char?`, `char->integer` (Phase 16 candidate)
+- **Dotted pairs & mutable pairs** — `Pair` vs `List` distinction, `set-car!`/`set-cdr!` (Phase 17 candidate)
+- **Macros** (`define-syntax` / `syntax-rules`) — needs a full macro expander (Phase 18 candidate)
+- **`call/cc`** — needs continuation support, major architectural change (Phase 19 candidate, may defer indefinitely)
+- **BigInt** — integers are i64 only, would need `num-bigint` dependency (not recommended)
+- **Exact/inexact distinction** — adds complexity for little benefit (not recommended)
 - **`eval` procedure** — exposing eval to Scheme code
 - **I/O ports** — `read`, `write`, `open-input-file`, etc.
-- **`for-each`** — single-list iteration for side effects
-- **`cadr` / `caddr` / `cddr` etc.** — composition of car/cdr
-- **`set-car!` / `set-cdr!`** — mutable pairs
-- **Dotted pairs** — `(cons 1 2)` should create a pair, not a 2-element list
+
+See `projects/FUTURE_PLAN.md` for priority ordering and effort estimates.
 
 ## Related Documents
 
@@ -237,6 +256,9 @@ These items are documented in `projects/R5RS_SUPPORT.md` and `projects/TODO.md` 
 | `projects/SPEC_NUMERIC.md` | Numeric tower spec (Phase 8) |
 | `projects/SPEC_PERF.md` | Performance spec (Phase 9) |
 | `projects/SPEC_PHASE10.md` | Bug fixes + R5RS spec (Phase 10) |
+| `projects/SPEC_PHASE11.md` | R5RS core gaps spec (Phase 11) |
+| `projects/SPEC_ENV_TRAIT.md` | Environment trait spec (Phase 12) |
+| `projects/FUTURE_PLAN.md` | Candidate phases 13-19 with priority ordering |
 | `projects/TODO.md` | Live task tracker (all phases) |
 | `projects/CAPABILITY_MAP.md` | Interpreter capability map |
-| `projects/R5RS_SUPPORT.md` | R5RS feature support audit (63/151 features, ~43%) |
+| `projects/R5RS_SUPPORT.md` | R5RS feature support audit (88/152 features, ~58%) |

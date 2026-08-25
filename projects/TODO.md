@@ -412,3 +412,114 @@
 - [x] Examples updated, no begin workarounds
 - [x] All 57 tests pass
 - [x] Zero compiler warnings
+
+---
+
+## Phase 11: R5RS Core Gaps (`r5rs-3`)
+
+> **Spec**: `projects/SPEC_PHASE11.md`
+
+### Special Forms
+
+- [x] **Task 44: `define` function shorthand**
+  - Acceptance: `(define (f x) body...)` works as `(define f (lambda (x) body...))`
+  - Verify: New test `define_shorthand_test` passes, all 65 tests pass
+  - Files: `src/eval.rs`, `tests/spec.rs`
+  - Status: `[x]` done
+
+- [x] **Task 45: `let*` — sequential bindings**
+  - Acceptance: `(let* ((x 1) (y (+ x 1))) (+ x y))` → `3`
+  - Verify: New test `let_star_test` passes
+  - Files: `src/eval.rs`, `tests/spec.rs`
+  - Status: `[x]` done
+
+- [x] **Task 46: `letrec` — recursive bindings**
+  - Acceptance: Mutual recursion via letrec works
+  - Verify: New test `letrec_test` passes
+  - Files: `src/eval.rs`, `tests/spec.rs`
+  - Status: `[x]` done
+
+- [x] **Task 47: `and` / `or` — short-circuit boolean operators**
+  - Acceptance: `(and 1 2 3)` → `3`, `(or #f #f 3)` → `3`, short-circuit works
+  - Verify: New test `and_or_test` passes
+  - Files: `src/eval.rs`, `tests/spec.rs`
+  - Status: `[x]` done
+
+### List Utilities
+
+- [x] **Task 48: `reverse`, `list-ref`, `list-tail`, `member`/`memq`/`memv`, `assoc`/`assq`/`assv`**
+  - Acceptance: All list utilities work as specified
+  - Verify: New test `list_utils_test` passes
+  - Files: `src/builtins.rs`, `tests/spec.rs`
+  - Status: `[x]` done
+
+### String Utilities
+
+- [x] **Task 49: `string=?`, `string<?`, `string>?`, `substring`, `string-ref`, `string->list`, `list->string`, `make-string`**
+  - Acceptance: All string utilities work
+  - Verify: New test `string_utils_test` passes
+  - Files: `src/builtins.rs`, `tests/spec.rs`
+  - Status: `[x]` done
+
+### Math Functions
+
+- [x] **Task 50: `sqrt`, `expt`, `floor`, `ceiling`, `round`, `truncate`, `gcd`, `lcm`**
+  - Acceptance: All math functions work
+  - Verify: New test `math_functions_test` passes
+  - Files: `src/builtins.rs`, `tests/spec.rs`
+  - Status: `[x]` done
+
+### Error Handling
+
+- [x] **Task 51: `error` procedure**
+  - Acceptance: `(error "msg")` raises RuntimeError
+  - Verify: New test `error_procedure_test` passes
+  - Files: `src/builtins.rs`, `tests/spec.rs`
+  - Status: `[x]` done
+
+### Checkpoint: R5RS Core Gaps
+- [x] define shorthand, let*, letrec, and/or work
+- [x] List utilities (reverse, list-ref, list-tail, member/memq/memv, assoc/assq/assv) work
+- [x] String utilities (string=?, substring, string-ref, string->list, etc.) work
+- [x] Math functions (sqrt, expt, floor, ceiling, round, truncate, gcd, lcm) work
+- [x] error procedure works
+- [x] All 65 tests pass
+- [x] Zero compiler warnings
+- [x] ~58% R5RS coverage (was ~43%)
+
+---
+
+## Phase 12: Environment Trait (`env-trait`)
+
+> **Spec**: `projects/SPEC_ENV_TRAIT.md`
+
+- [x] **Task 52: Introduce `Environment` trait + `EnvRef` + centralized constructors**
+  - Acceptance: `Environment` trait with `get`/`set`/`define`. `EnvRef = Rc<RefCell<dyn Environment>>`. `Env::new()`/`root()`/`child()`/`child_with()` constructors. Zero `Rc<RefCell<Env>>` outside env.rs. All 65 tests pass.
+  - Verify: `cargo build` zero warnings, `cargo test` 65/65
+  - Files: `src/env.rs`, `src/eval.rs`, `src/types.rs`, `src/builtins.rs`, `src/cli.rs`, `src/main.rs`, `src/bench.rs`, `tests/spec.rs`, `src/lib.rs`
+  - Status: `[x]` done (commit `78eb9f7`)
+  - Note: Committed without formal plan review. Spec is retroactive. Code is sound.
+
+### Checkpoint: Environment Trait
+- [x] `Environment` trait with `get`/`set`/`define` in place
+- [x] `EnvRef` type alias used everywhere (was `Rc<RefCell<Env>>`)
+- [x] `Env::new()`/`root()`/`child()`/`child_with()` constructors (was 17 ad-hoc struct literals)
+- [x] `define()` method replaces `env.borrow_mut().local.borrow_mut().insert()` pattern
+- [x] `Procedure::PartialEq` fixed (manual impl with `Rc::ptr_eq`)
+- [x] All 65 tests pass
+- [x] Zero compiler warnings
+- [x] Enables future InternedEnv (perf) and mock environments (testing)
+
+---
+
+## Future Work (Not Planned — See `projects/FUTURE_PLAN.md`)
+
+- [ ] **Phase 13 candidate: InternedEnv** — interned u32 symbol keys, eliminate string hashing
+- [ ] **Phase 14 candidate: R5RS remaining core** — for-each, cadr/cddr, string->number, transcendental math
+- [ ] **Phase 15 candidate: Vectors** — `#(...)` syntax, vector operations
+- [ ] **Phase 16 candidate: Character type** — `#\a`, char?, char->integer
+- [ ] **Phase 17 candidate: Dotted pairs & mutable pairs** — Pair vs List, set-car!/set-cdr!
+- [ ] **Phase 18 candidate: Macros** — define-syntax/syntax-rules
+- [ ] **Phase 19 candidate: call/cc** — continuation support (may defer indefinitely)
+- [ ] **Not recommended: BigInt** — i64 sufficient, would need num-bigint dependency
+- [ ] **Not recommended: Exact/inexact** — adds complexity for little benefit
