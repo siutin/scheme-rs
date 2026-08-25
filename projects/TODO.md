@@ -86,11 +86,11 @@
   - Files: `src/error.rs` (new), `src/lib.rs`
   - Status: `[x]` done
 
-- [ ] **Task 10: Extract `parser.rs`**
+- [x] **Task 10: Extract `parser.rs`**
   - Acceptance: `tokenize`, `read_from_tokens`, `atom`, `parse`, `ReadFromTokenResult` live in `src/parser.rs`.
   - Verify: `cargo build` succeeds, `cargo test` passes (30+)
   - Files: `src/parser.rs` (new), `src/lib.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 - [ ] **Task 11: Extract `env.rs`**
   - Acceptance: `Env` impl block (the `get` method) lives in `src/env.rs`.
