@@ -58,17 +58,17 @@
   - Files: `src/lib.rs` (or `builtins.rs`), `tests/spec.rs`
   - Status: `[x]` done
 
-- [ ] **Task 7: Replace `panic!()`/`unreachable!()` with `SchemeError`**
+- [x] **Task 7: Replace `panic!()`/`unreachable!()` with `SchemeError`**
   - Acceptance: No `panic!()` or `unreachable!()` in code paths reachable from user input. All replaced with `Err(SchemeError::...)`.
   - Verify: `grep -rn "panic!\|unreachable!" src/` returns nothing (or only in truly unreachable internal invariants), `cargo test` passes
   - Files: `src/lib.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 ### Checkpoint: Bug Fixes
-- [ ] All bug-fix tests pass
-- [ ] No `panic!()` or `unreachable!()` reachable from user input
-- [ ] All 30 original tests still pass
-- [ ] Zero compiler warnings
+- [x] All bug-fix tests pass
+- [x] No `panic!()` or `unreachable!()` reachable from user input
+- [x] All 30 original tests still pass
+- [x] Zero compiler warnings
 
 ---
 

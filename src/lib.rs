@@ -540,7 +540,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                             if let (Some(&DataType::Symbol(ref name)), Some(ref value)) = (Some(name_ref), Some(value_ref)) {
                                                 procedure_local.borrow_mut().insert(name.to_string(), value.clone());
                                             } else {
-                                                unreachable!()
+                                                return Err(SchemeError::RuntimeError("internal error: unexpected state".into()))
                                             }
                                         }
 
@@ -587,7 +587,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                                 if let (Some(&DataType::Symbol(ref name)), Some(ref value)) = (Some(name_ref), Some(value_ref)) {
                                                     p_env_borrow_mut.local.borrow_mut().insert(name.to_string(), value.clone());
                                                 } else {
-                                                    unreachable!()
+                                                    return Err(SchemeError::RuntimeError("internal error: unexpected state".into()))
                                                 }
                                             }
                                             Env {
@@ -622,7 +622,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
             let data = match ast_option {
                 Some(AST::Integer(i)) => Some(DataType::Number(i as f64)),
                 Some(AST::Float(f)) => Some(DataType::Number(f)),
-                Some(_) => unreachable!(),
+                Some(_) => return Err(SchemeError::RuntimeError("internal error: unexpected state".into())),
                 None => None
             };
             Ok(data)
@@ -672,7 +672,7 @@ pub fn setup() -> HashMap<String, DataType> {
         let desc = vec.iter().map(|&ref x|
             match x {
                 &DataType::Number(f) => f.to_string(),
-                _ => unreachable!(),
+                _ => String::new(),
             }
         ).collect::<Vec<String>>().join(" + ");
         debug!("Description: {}", desc);
@@ -721,7 +721,7 @@ pub fn setup() -> HashMap<String, DataType> {
             let desc = vec.iter().map(|&ref x|
                 match x {
                     &DataType::Number(f) => f.to_string(),
-                    _ => panic!("Something went wrong"),
+                    _ => String::new(),
                 }
             ).collect::<Vec<String>>().join(" x ");
             debug!("Description: {}", desc);
@@ -930,7 +930,7 @@ pub fn setup() -> HashMap<String, DataType> {
                         if let (Some(&DataType::Symbol(ref name)), Some(value)) = (Some(name_ref), Some(value_ref)) {
                             procedure_local.borrow_mut().insert(name.to_string(), value.clone());
                         } else {
-                            unreachable!()
+                            return Err(SchemeError::RuntimeError("internal error: unexpected state".into()))
                         }
                     }
 
@@ -1094,7 +1094,7 @@ pub fn setup() -> HashMap<String, DataType> {
                             if let (Some(&DataType::Symbol(ref name)), Some(ref value)) = (Some(name_ref), Some(value_ref)) {
                                 procedure_local.borrow_mut().insert(name.to_string(), value.clone());
                             } else {
-                                unreachable!()
+                                return Err(SchemeError::RuntimeError("internal error: unexpected state".into()))
                             }
                         }
 
@@ -1112,7 +1112,7 @@ pub fn setup() -> HashMap<String, DataType> {
 
                     Ok(Some(DataType::List(list)))
                 },
-                _ => unreachable!()
+                _ => return Err(SchemeError::RuntimeError("internal error: unexpected state".into()))
             }
         } else {
             Err("syntax error".into())
