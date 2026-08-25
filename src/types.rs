@@ -86,14 +86,61 @@ impl<T> FloatIterExt for T where T: Iterator<Item=f64> {
 }
 
 #[derive(Clone, Debug)]
-#[derive(PartialEq)]
 pub enum DataType {
     Bool(bool),
     Pair((Box<DataType>, Box<DataType>)),
-    Number(f64),
+    Integer(i64),
+    Float(f64),
     Symbol(String),
     String(String),
     Proc(Function),
     List(Vec<DataType>),
     Lambda(Procedure)
+}
+
+impl PartialEq for DataType {
+    fn eq(&self, other: &DataType) -> bool {
+        match (self, other) {
+            // Cross-type numeric equality: Integer(42) == Float(42.0) is true
+            (&DataType::Integer(a), &DataType::Float(b)) => a as f64 == b,
+            (&DataType::Float(a), &DataType::Integer(b)) => a == b as f64,
+            (&DataType::Integer(a), &DataType::Integer(b)) => a == b,
+            (&DataType::Float(a), &DataType::Float(b)) => a == b,
+            (&DataType::Bool(a), &DataType::Bool(b)) => a == b,
+            (&DataType::Symbol(ref a), &DataType::Symbol(ref b)) => a == b,
+            (&DataType::String(ref a), &DataType::String(ref b)) => a == b,
+            (&DataType::Pair(ref a), &DataType::Pair(ref b)) => a == b,
+            (&DataType::List(ref a), &DataType::List(ref b)) => a == b,
+            (&DataType::Proc(ref a), &DataType::Proc(ref b)) => a == b,
+            (&DataType::Lambda(ref a), &DataType::Lambda(ref b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl DataType {
+    /// Extract f64 from either Integer or Float. Returns None for non-numbers.
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            &DataType::Integer(i) => Some(i as f64),
+            &DataType::Float(f) => Some(f),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a number (Integer or Float)
+    pub fn is_number(&self) -> bool {
+        match self {
+            &DataType::Integer(_) | &DataType::Float(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Check if this is an integer (Integer type specifically)
+    pub fn is_integer(&self) -> bool {
+        match self {
+            &DataType::Integer(_) => true,
+            _ => false,
+        }
+    }
 }

@@ -90,11 +90,11 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                             match a2.clone() {
                                 AST::Integer(i) => {
                                     let env_borrow_mut = env.borrow_mut();
-                                    env_borrow_mut.local.borrow_mut().insert(s1.clone(), DataType::Number(i as f64));
+                                    env_borrow_mut.local.borrow_mut().insert(s1.clone(), DataType::Integer(i));
                                 }
                                 AST::Float(f) => {
                                     let env_borrow_mut = env.borrow_mut();
-                                    env_borrow_mut.local.borrow_mut().insert(s1.clone(), DataType::Number(f));
+                                    env_borrow_mut.local.borrow_mut().insert(s1.clone(), DataType::Float(f));
                                 }
                                 AST::Symbol(ref s) => {
                                     if s.len() > 1 && s.starts_with("#") {
@@ -476,8 +476,8 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
         Some(_) | None => {
             debug!("ast is not a symbol/children");
             let data = match ast_option {
-                Some(AST::Integer(i)) => Some(DataType::Number(i as f64)),
-                Some(AST::Float(f)) => Some(DataType::Number(f)),
+                Some(AST::Integer(i)) => Some(DataType::Integer(i)),
+                Some(AST::Float(f)) => Some(DataType::Float(f)),
                 Some(_) => return Err(SchemeError::RuntimeError("internal error: unexpected state".into())),
                 None => None
             };
@@ -519,7 +519,8 @@ pub fn datatype2str(value: &DataType) -> String {
     match value {
         &DataType::Bool(b) => format!("{}", b),
         &DataType::Pair(ref p) => format!("({:?} . {:?})", p.0, p.1),
-        &DataType::Number(f) => format!("{}", f),
+        &DataType::Integer(i) => format!("{}", i),
+        &DataType::Float(f) => format!("{}", f),
         &DataType::Symbol(ref s) => format!("'{}", s),
         &DataType::String(ref s) => format!("\"{}\"", s),
         &DataType::Proc(ref p) => format!("{:?}", p),
@@ -557,7 +558,7 @@ fn ast2datatype(value: &AST) -> Result<DataType, SchemeError> {
                 Ok(DataType::Symbol(s.clone()))
             }
         }
-        &AST::Integer(i) => Ok(DataType::Number(i as f64)),
-        &AST::Float(f) => Ok(DataType::Number(f))
+        &AST::Integer(i) => Ok(DataType::Integer(i)),
+        &AST::Float(f) => Ok(DataType::Float(f))
     }
 }

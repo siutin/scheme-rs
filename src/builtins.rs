@@ -20,12 +20,14 @@ macro_rules! define_comparison {
                 let a = vec.get(0);
                 let b = vec.get(1);
 
-                if let (Some(&DataType::Number(ref a0)), Some(&DataType::Number(ref b0))) = (a, b) {
-                    let a1: f64 = a0.clone().into();
-                    let b1: f64 = b0.clone().into();
-                    let desc = format!("{} {} {}", a1, stringify!($name), b1);
-                    debug!("Description: {}", desc);
-                    Ok(Some(DataType::Bool($func(a1, b1))))
+                if let (Some(a0), Some(b0)) = (a, b) {
+                    if let (Some(a1), Some(b1)) = (a0.as_f64(), b0.as_f64()) {
+                        let desc = format!("{} {} {}", a1, stringify!($name), b1);
+                        debug!("Description: {}", desc);
+                        Ok(Some(DataType::Bool($func(a1, b1))))
+                    } else {
+                        return Err("wrong argument datatype".into());
+                    }
                 } else {
                     return Err("wrong argument datatype".into());
                 }
@@ -36,108 +38,83 @@ macro_rules! define_comparison {
 
 pub fn setup() -> HashMap<String, DataType> {
     let mut map = HashMap::new();
-    map.insert("pi".to_string(), DataType::Number(std::f64::consts::PI));
+    map.insert("pi".to_string(), DataType::Float(std::f64::consts::PI));
 
     map.insert("+".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "+", vec);
-        let is_numbers = vec.iter().all(|&ref x| if let &DataType::Number(_) = x { true } else { false });
-        if !is_numbers {
+        if !vec.iter().all(|x| x.is_number()) {
             return Err("wrong argument datatype".into());
         }
-
-        let desc = vec.iter().map(|&ref x|
-            match x {
-                &DataType::Number(f) => f.to_string(),
-                _ => String::new(),
-            }
-        ).collect::<Vec<String>>().join(" + ");
-        debug!("Description: {}", desc);
-        let numbers = vec.iter().filter_map(|&ref x| { if let &DataType::Number(ref y) = x { Some(y.clone()) } else { None } });
-        let data: f64 = numbers.map(|x| {
-            let y: f64 = x.clone().into();
-            y
-        }).sum();
-        Ok(Some(DataType::Number(data)))
+        // If all integers, stay integer; otherwise promote to float
+        let all_int = vec.iter().all(|x| x.is_integer());
+        if all_int {
+            let sum: i64 = vec.iter().filter_map(|x| if let &DataType::Integer(i) = x { Some(i) } else { None }).sum();
+            Ok(Some(DataType::Integer(sum)))
+        } else {
+            let sum: f64 = vec.iter().filter_map(|x| x.as_f64()).sum();
+            Ok(Some(DataType::Float(sum)))
+        }
     }))));
 
     map.insert("-".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "-", vec);
-        let is_numbers = vec.iter().all(|&ref x| if let &DataType::Number(_) = x { true } else { false });
-
-        if !is_numbers {
+        if !vec.iter().all(|x| x.is_number()) {
             return Err("wrong argument datatype".into());
         }
-
         if vec.is_empty() {
             return Err("- function requires at least one argument".into());
         }
-
-        let numbers: Vec<f64> = vec.iter().filter_map(|&ref x| { if let &DataType::Number(ref y) = x { Some(y.clone()) } else { None } })
-            .map(|x| x.into())
-            .collect();
-
-        let value: f64 = if numbers.len() == 1 {
-            -numbers[0]
+        let all_int = vec.iter().all(|x| x.is_integer());
+        if all_int {
+            let ints: Vec<i64> = vec.iter().filter_map(|x| if let &DataType::Integer(i) = x { Some(i) } else { None }).collect();
+            let value = if ints.len() == 1 { -ints[0] } else { ints[1..].iter().fold(ints[0], |acc, x| acc - x) };
+            Ok(Some(DataType::Integer(value)))
         } else {
-            let first = numbers[0];
-            numbers[1..].iter().fold(first, |acc, x| acc - x)
-        };
-        Ok(Some(DataType::Number(value)))
-
+            let nums: Vec<f64> = vec.iter().filter_map(|x| x.as_f64()).collect();
+            let value = if nums.len() == 1 { -nums[0] } else { nums[1..].iter().fold(nums[0], |acc, x| acc - x) };
+            Ok(Some(DataType::Float(value)))
+        }
     }))));
 
     map.insert("*".to_string(), DataType::Proc(
         Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
             debug!("Function - name: {:?} - Args: {:?}", "*", vec);
-            let is_numbers = vec.iter().all(|&ref x| if let &DataType::Number(_) = x { true } else { false });
-            if !is_numbers {
+            if !vec.iter().all(|x| x.is_number()) {
                 return Err("wrong argument datatype".into());
             }
-
-            let desc = vec.iter().map(|&ref x|
-                match x {
-                    &DataType::Number(f) => f.to_string(),
-                    _ => String::new(),
-                }
-            ).collect::<Vec<String>>().join(" x ");
-            debug!("Description: {}", desc);
-
-            let numbers = vec.iter().filter_map(|&ref x| { if let &DataType::Number(ref y) = x { Some(y.clone()) } else { None } });
-            let data: f64 = numbers.map(|x| {
-                let y: f64 = x.clone().into();
-                y
-            }).product();
-            Ok(Some(DataType::Number(data)))
+            let all_int = vec.iter().all(|x| x.is_integer());
+            if all_int {
+                let product: i64 = vec.iter().filter_map(|x| if let &DataType::Integer(i) = x { Some(i) } else { None }).product();
+                Ok(Some(DataType::Integer(product)))
+            } else {
+                let product: f64 = vec.iter().filter_map(|x| x.as_f64()).product();
+                Ok(Some(DataType::Float(product)))
+            }
         }))));
 
     map.insert("/".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "/", vec);
-        let is_numbers = vec.iter().all(|&ref x| if let &DataType::Number(_) = x { true } else { false });
-
-        if !is_numbers {
+        if !vec.iter().all(|x| x.is_number()) {
             return Err("wrong argument datatype".into());
         }
-
         if vec.is_empty() {
             return Err("/ function requires at least one argument".into());
         }
 
-        let numbers: Vec<f64> = vec.iter().filter_map(|&ref x| { if let &DataType::Number(ref y) = x { Some(y.clone()) } else { None } })
-            .map(|x| x.into())
-            .collect();
+        let numbers: Vec<f64> = vec.iter().filter_map(|x| x.as_f64()).collect();
 
         // Check for division by zero in any divisor
         if numbers.len() > 1 && numbers[1..].iter().any(|&x| x == 0.0) {
             return Err(SchemeError::DivisionByZero);
         }
 
+        // Division always returns Float (may produce non-integers)
         let value: f64 = if numbers.len() == 1 {
             1.0 / numbers[0]
         } else {
-            let first = numbers[0];
-            numbers[1..].iter().fold(first, |acc, x| acc / x)
+            numbers[1..].iter().fold(numbers[0], |acc, x| acc / x)
         };
-        Ok(Some(DataType::Number(value)))
+        Ok(Some(DataType::Float(value)))
     }))));
 
     define_comparison!(gt, ">", |a,b| { a > b });
@@ -165,7 +142,8 @@ pub fn setup() -> HashMap<String, DataType> {
             return Err("abs function unknown argument type".into());
         }
         match value_option.unwrap() {
-            &DataType::Number(f) => Ok(Some(DataType::Number(f.abs()))),
+            &DataType::Integer(i) => Ok(Some(DataType::Integer(i.abs()))),
+            &DataType::Float(f) => Ok(Some(DataType::Float(f.abs()))),
             _ => Err("abs function requires an argument of type 'number'".into())
         }
     }))));
@@ -181,7 +159,8 @@ pub fn setup() -> HashMap<String, DataType> {
             let value_option = vec.first();
             return match value_option {
                 Some(&DataType::List(ref l)) => Ok(Some(DataType::List(l.clone()))),
-                Some(&DataType::Number(n)) => Ok(Some(DataType::Number(n))),
+                Some(&DataType::Integer(n)) => Ok(Some(DataType::Integer(n))),
+                Some(&DataType::Float(n)) => Ok(Some(DataType::Float(n))),
                 Some(&DataType::Bool(b)) => Ok(Some(DataType::Bool(b))),
                 Some(&DataType::Symbol(ref s)) => Ok(Some(DataType::Symbol(s.clone()))),
                 Some(&DataType::String(ref s)) => Ok(Some(DataType::String(s.clone()))),
@@ -205,11 +184,19 @@ pub fn setup() -> HashMap<String, DataType> {
                         for item in rest.iter() {
                             match item {
                                 &DataType::List(ref l2) => list.append(&mut l2.clone()),
-                                &DataType::Number(n) => {
+                                &DataType::Integer(n) => {
                                     return Ok(Some(
                                         DataType::Pair(
                                             (Box::new(DataType::List(list.clone())),
-                                             Box::new(DataType::Number(n)))
+                                             Box::new(DataType::Integer(n)))
+                                        )
+                                    ))
+                                },
+                                &DataType::Float(n) => {
+                                    return Ok(Some(
+                                        DataType::Pair(
+                                            (Box::new(DataType::List(list.clone())),
+                                             Box::new(DataType::Float(n)))
                                         )
                                     ))
                                 },
@@ -414,7 +401,7 @@ pub fn setup() -> HashMap<String, DataType> {
             return Err("length function unknown argument type".into());
         }
         match value_option.unwrap() {
-            &DataType::List(ref vec) => Ok(Some(DataType::Number(vec.len() as f64))),
+            &DataType::List(ref vec) => Ok(Some(DataType::Integer(vec.len() as i64))),
             _ => Err("length function requires an argument of type 'list'".into())
         }
     }))));
@@ -497,31 +484,32 @@ pub fn setup() -> HashMap<String, DataType> {
 
     map.insert("max".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "max", vec);
-        let is_numbers = vec.iter().all(|&ref x| if let &DataType::Number(_) = x { true } else { false });
-        if !is_numbers {
+        if !vec.iter().all(|x| x.is_number()) {
             return Err("wrong argument datatype".into());
         }
-        let numbers = vec.iter().filter_map(|&ref x| { if let &DataType::Number(ref y) = x { Some(y.clone()) } else { None } });
-        let data = numbers.map(|x| {
-            let y: f64 = x.clone().into();
-            y
-        }).float_max();
-        Ok(Some(DataType::Number(data.into())))
+        let all_int = vec.iter().all(|x| x.is_integer());
+        if all_int {
+            let data = vec.iter().filter_map(|x| if let &DataType::Integer(i) = x { Some(i) } else { None }).max().unwrap();
+            Ok(Some(DataType::Integer(data)))
+        } else {
+            let data = vec.iter().filter_map(|x| x.as_f64()).float_max();
+            Ok(Some(DataType::Float(data)))
+        }
     }))));
 
     map.insert("min".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         debug!("Function - name: {:?} - Args: {:?}", "min", vec);
-        let is_numbers = vec.iter().all(|&ref x| if let &DataType::Number(_) = x { true } else { false });
-        if !is_numbers {
+        if !vec.iter().all(|x| x.is_number()) {
             return Err("wrong argument datatype".into());
         }
-        let numbers = vec.iter().filter_map(|&ref x| { if let &DataType::Number(ref y) = x { Some(y.clone()) } else { None } });
-
-        let data = numbers.map(|x| {
-            let y: f64 = x.clone().into();
-            y
-        }).float_min();
-        Ok(Some(DataType::Number(data.into())))
+        let all_int = vec.iter().all(|x| x.is_integer());
+        if all_int {
+            let data = vec.iter().filter_map(|x| if let &DataType::Integer(i) = x { Some(i) } else { None }).min().unwrap();
+            Ok(Some(DataType::Integer(data)))
+        } else {
+            let data = vec.iter().filter_map(|x| x.as_f64()).float_min();
+            Ok(Some(DataType::Float(data)))
+        }
     }))));
 
     map.insert("not".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
@@ -549,7 +537,8 @@ pub fn setup() -> HashMap<String, DataType> {
             return Err("number? function unknown argument type".into());
         }
         match value_option.unwrap() {
-            &DataType::Number(_) => Ok(Some(DataType::Bool(true))),
+            &DataType::Integer(_) => Ok(Some(DataType::Bool(true))),
+            &DataType::Float(_) => Ok(Some(DataType::Bool(true))),
             _ => Ok(Some(DataType::Bool(false)))
         }
     }))));
@@ -658,12 +647,21 @@ pub fn setup() -> HashMap<String, DataType> {
         Ok(Some(DataType::Bool(a == b)))
     }))));
 
-    // eqv? — same as eq? for our purposes (numbers, symbols, bools)
+    // eqv? — type-sensitive equality (Integer(1) != Float(1.0))
     map.insert("eqv?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         if vec.len() != 2 { return Err("eqv? requires 2 arguments".into()); }
         let a = vec.get(0).unwrap();
         let b = vec.get(1).unwrap();
-        Ok(Some(DataType::Bool(a == b)))
+        // eqv? is type-sensitive: same type + same value
+        let same = match (a, b) {
+            (&DataType::Integer(x), &DataType::Integer(y)) => x == y,
+            (&DataType::Float(x), &DataType::Float(y)) => x == y,
+            (&DataType::Bool(x), &DataType::Bool(y)) => x == y,
+            (&DataType::Symbol(ref x), &DataType::Symbol(ref y)) => x == y,
+            (&DataType::String(ref x), &DataType::String(ref y)) => x == y,
+            _ => false,
+        };
+        Ok(Some(DataType::Bool(same)))
     }))));
 
     // equal? — deep equality (lists compared element-wise)
@@ -702,7 +700,7 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("string-length".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         if vec.len() != 1 { return Err("string-length requires 1 argument".into()); }
         match vec.get(0) {
-            Some(&DataType::String(ref s)) => Ok(Some(DataType::Number(s.len() as f64))),
+            Some(&DataType::String(ref s)) => Ok(Some(DataType::Integer(s.len() as i64))),
             _ => Err("string-length requires a string".into()),
         }
     }))));
@@ -747,7 +745,7 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("zero?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         if vec.len() != 1 { return Err("zero? requires 1 argument".into()); }
         match vec.get(0) {
-            Some(&DataType::Number(n)) => Ok(Some(DataType::Bool(n == 0.0))),
+            Some(x) if x.is_number() => Ok(Some(DataType::Bool(x.as_f64().unwrap() == 0.0))),
             _ => Err("zero? requires a number".into()),
         }
     }))));
@@ -755,7 +753,7 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("positive?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         if vec.len() != 1 { return Err("positive? requires 1 argument".into()); }
         match vec.get(0) {
-            Some(&DataType::Number(n)) => Ok(Some(DataType::Bool(n > 0.0))),
+            Some(x) if x.is_number() => Ok(Some(DataType::Bool(x.as_f64().unwrap() > 0.0))),
             _ => Err("positive? requires a number".into()),
         }
     }))));
@@ -763,7 +761,7 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("negative?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         if vec.len() != 1 { return Err("negative? requires 1 argument".into()); }
         match vec.get(0) {
-            Some(&DataType::Number(n)) => Ok(Some(DataType::Bool(n < 0.0))),
+            Some(x) if x.is_number() => Ok(Some(DataType::Bool(x.as_f64().unwrap() < 0.0))),
             _ => Err("negative? requires a number".into()),
         }
     }))));
@@ -771,7 +769,7 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("even?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         if vec.len() != 1 { return Err("even? requires 1 argument".into()); }
         match vec.get(0) {
-            Some(&DataType::Number(n)) => Ok(Some(DataType::Bool(n as i64 % 2 == 0))),
+            Some(x) if x.is_number() => Ok(Some(DataType::Bool(x.as_f64().unwrap() as i64 % 2 == 0))),
             _ => Err("even? requires a number".into()),
         }
     }))));
@@ -779,7 +777,7 @@ pub fn setup() -> HashMap<String, DataType> {
     map.insert("odd?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         if vec.len() != 1 { return Err("odd? requires 1 argument".into()); }
         match vec.get(0) {
-            Some(&DataType::Number(n)) => Ok(Some(DataType::Bool(n as i64 % 2 != 0))),
+            Some(x) if x.is_number() => Ok(Some(DataType::Bool(x.as_f64().unwrap() as i64 % 2 != 0))),
             _ => Err("odd? requires a number".into()),
         }
     }))));
@@ -788,9 +786,12 @@ pub fn setup() -> HashMap<String, DataType> {
 
     map.insert("modulo".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         if vec.len() != 2 { return Err("modulo requires 2 arguments".into()); }
-        if let (Some(&DataType::Number(a)), Some(&DataType::Number(b))) = (vec.get(0), vec.get(1)) {
-            if b == 0.0 { return Err(SchemeError::DivisionByZero); }
-            Ok(Some(DataType::Number((a as i64 % b as i64) as f64)))
+        if let (Some(a), Some(b)) = (vec.get(0), vec.get(1)) {
+            if !a.is_number() || !b.is_number() { return Err("modulo requires numbers".into()); }
+            let ai = a.as_f64().unwrap() as i64;
+            let bi = b.as_f64().unwrap() as i64;
+            if bi == 0 { return Err(SchemeError::DivisionByZero); }
+            Ok(Some(DataType::Integer(ai % bi)))
         } else {
             Err("modulo requires numbers".into())
         }
@@ -798,9 +799,12 @@ pub fn setup() -> HashMap<String, DataType> {
 
     map.insert("quotient".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         if vec.len() != 2 { return Err("quotient requires 2 arguments".into()); }
-        if let (Some(&DataType::Number(a)), Some(&DataType::Number(b))) = (vec.get(0), vec.get(1)) {
-            if b == 0.0 { return Err(SchemeError::DivisionByZero); }
-            Ok(Some(DataType::Number((a as i64 / b as i64) as f64)))
+        if let (Some(a), Some(b)) = (vec.get(0), vec.get(1)) {
+            if !a.is_number() || !b.is_number() { return Err("quotient requires numbers".into()); }
+            let ai = a.as_f64().unwrap() as i64;
+            let bi = b.as_f64().unwrap() as i64;
+            if bi == 0 { return Err(SchemeError::DivisionByZero); }
+            Ok(Some(DataType::Integer(ai / bi)))
         } else {
             Err("quotient requires numbers".into())
         }
@@ -808,9 +812,12 @@ pub fn setup() -> HashMap<String, DataType> {
 
     map.insert("remainder".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
         if vec.len() != 2 { return Err("remainder requires 2 arguments".into()); }
-        if let (Some(&DataType::Number(a)), Some(&DataType::Number(b))) = (vec.get(0), vec.get(1)) {
-            if b == 0.0 { return Err(SchemeError::DivisionByZero); }
-            Ok(Some(DataType::Number((a as i64 % b as i64) as f64)))
+        if let (Some(a), Some(b)) = (vec.get(0), vec.get(1)) {
+            if !a.is_number() || !b.is_number() { return Err("remainder requires numbers".into()); }
+            let ai = a.as_f64().unwrap() as i64;
+            let bi = b.as_f64().unwrap() as i64;
+            if bi == 0 { return Err(SchemeError::DivisionByZero); }
+            Ok(Some(DataType::Integer(ai % bi)))
         } else {
             Err("remainder requires numbers".into())
         }

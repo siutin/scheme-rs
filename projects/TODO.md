@@ -268,37 +268,37 @@
 
 > **Spec**: `projects/SPEC_NUMERIC.md`
 
-- [ ] **Task 30: Split `DataType::Number` into `Integer`/`Float`**
-  - Acceptance: `DataType` has `Integer(i64)` and `Float(f64)` instead of `Number(f64)`. `PartialEq` handles cross-type numeric equality (`Integer(42) == Float(42.0)` is true).
-  - Verify: `cargo build` succeeds (may have errors in other files, that's OK — fixed in Tasks 31-33)
+- [x] **Task 30: Split `DataType::Number` into `Integer`/`Float`**
+  - Acceptance: `DataType` has `Integer(i64)` and `Float(f64)` instead of `Number(f64)`. `PartialEq` handles cross-type numeric equality (`Integer(42) == Float(42.0)` is true). Helper methods `as_f64()`, `is_number()`, `is_integer()` added.
+  - Verify: `cargo build` succeeds
   - Files: `src/types.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
-- [ ] **Task 31: Update `eval.rs` for Integer/Float**
-  - Acceptance: `define` handles `AST::Integer` → `DataType::Integer`, `AST::Float` → `DataType::Float`. `ast2datatype` updated. All literal handling uses new variants.
-  - Verify: `cargo build` succeeds (builtins may still have errors)
+- [x] **Task 31: Update `eval.rs` for Integer/Float**
+  - Acceptance: `define` handles `AST::Integer` → `DataType::Integer`, `AST::Float` → `DataType::Float`. `ast2datatype` updated. `datatype2str` updated.
+  - Verify: `cargo build` succeeds
   - Files: `src/eval.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
-- [ ] **Task 32: Update `builtins.rs` with promotion rules**
-  - Acceptance: Arithmetic uses integer arithmetic when both operands are integers, promotes to float when mixed. `/` always returns Float. `modulo`/`quotient`/`remainder` return Integer. Comparisons work across types. Predicates (`zero?`, `positive?`, etc.) work on both types.
+- [x] **Task 32: Update `builtins.rs` with promotion rules**
+  - Acceptance: Arithmetic uses integer arithmetic when both operands are integers, promotes to float when mixed. `/` always returns Float. `modulo`/`quotient`/`remainder` return Integer. Comparisons work across types. Predicates work on both types. `eqv?` is type-sensitive.
   - Verify: `cargo build` succeeds, `cargo test` passes
   - Files: `src/builtins.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
-- [ ] **Task 33: Update tests for Integer/Float**
+- [x] **Task 33: Update tests for Integer/Float**
   - Acceptance: Existing tests updated to expect `Integer(...)` or `Float(...)` instead of `Number(...)`. New tests for: integer preservation, mixed-type promotion, division returns float, numeric equality vs type equality.
-  - Verify: All tests pass, new tests cover promotion rules
+  - Verify: All 51 tests pass (was 49, added 2 new)
   - Files: `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 ### Checkpoint: Numeric Tower
-- [ ] `42` evaluates to `Integer(42)`, not `Float(42.0)`
-- [ ] `(+ 1 2)` → `Integer(3)`, `(+ 1 2.0)` → `Float(3.0)`
-- [ ] `(/ 6 2)` → `Float(3.0)`
-- [ ] `(= 1 1.0)` → `#t`, `(eqv? 1 1.0)` → `#f`
-- [ ] All tests pass
-- [ ] Zero compiler warnings
+- [x] `42` evaluates to `Integer(42)`, not `Float(42.0)`
+- [x] `(+ 1 2)` → `Integer(3)`, `(+ 1 2.0)` → `Float(3.0)`
+- [x] `(/ 6 2)` → `Float(3.0)`
+- [x] `(= 1 1.0)` → `#t`, `(eqv? 1 1.0)` → `#f`
+- [x] All 51 tests pass
+- [x] Zero compiler warnings
 
 ---
 
