@@ -308,11 +308,11 @@
 
 ### Examples
 
-- [ ] **Task 34: Create example .scm files**
+- [x] **Task 34: Create example .scm files**
   - Acceptance: `examples/fact.scm`, `examples/fib.scm`, `examples/loop.scm`, `examples/list.scm`, `examples/closures.scm` all run without error via `cargo run --bin scheme -- examples/<file>.scm`
-  - Verify: Each file runs and produces expected output
-  - Files: `examples/fact.scm`, `examples/fib.scm`, `examples/loop.scm`, `examples/list.scm`, `examples/closures.scm`
-  - Status: `[ ]`
+  - Verify: All 5 examples run and produce expected output
+  - Files: `examples/fact.scm`, `examples/fib.scm`, `examples/loop.scm`, `examples/list.scm`, `examples/closures.scm`, `src/parser.rs` (comment + string tokenizer fix)
+  - Status: `[x]` done
 
 ### Missing Builtins
 

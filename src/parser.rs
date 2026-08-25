@@ -16,19 +16,64 @@ pub fn parse(program: &str) -> Result<ReadFromTokenResult, SchemeError> {
 
 fn tokenize(program: &str) -> Vec<String>
 {
-    let iterator = Box::new(program.chars());
-    let count = iterator.clone().count();
-    let vec = iterator.fold(Vec::with_capacity(count), |mut acc, x| {
-        if x == '(' || x == ')' {
-            acc.extend(vec![' ', x, ' '])
+    // Strip Scheme comments: ; to end of line (but not inside strings)
+    let stripped: String = program.lines()
+        .map(|line| {
+            let mut in_string = false;
+            let mut result = String::new();
+            for c in line.chars() {
+                if c == '"' {
+                    in_string = !in_string;
+                }
+                if c == ';' && !in_string {
+                    break;
+                }
+                result.push(c);
+            }
+            result
+        })
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    // Tokenize: split on whitespace and parens, but keep strings intact
+    let mut tokens: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut in_string = false;
+
+    for c in stripped.chars() {
+        if in_string {
+            current.push(c);
+            if c == '"' {
+                tokens.push(current.clone());
+                current.clear();
+                in_string = false;
+            }
+        } else if c == '"' {
+            if !current.is_empty() {
+                tokens.push(current.clone());
+                current.clear();
+            }
+            current.push(c);
+            in_string = true;
+        } else if c == '(' || c == ')' {
+            if !current.is_empty() {
+                tokens.push(current.clone());
+                current.clear();
+            }
+            tokens.push(c.to_string());
+        } else if c.is_whitespace() {
+            if !current.is_empty() {
+                tokens.push(current.clone());
+                current.clear();
+            }
         } else {
-            acc.push(x)
+            current.push(c);
         }
-        acc
-    });
-    let s: String = vec.into_iter().collect();
-    let ss: Vec<String> = s.split_whitespace().map(|x| x.to_string()).collect();
-    ss
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    tokens
 }
 
 fn read_from_tokens(mut tokens: Vec<String>) -> Result<ReadFromTokenResult, SchemeError> {
