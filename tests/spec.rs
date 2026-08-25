@@ -496,6 +496,146 @@ fn quasiquote_test() {
 }
 
 #[test]
+fn define_shorthand_test() {
+    // (define (f x) body) shorthand
+    assert_eq!(Ok(Some(DataType::Integer(11))),
+        run("(define (add1 x) (+ x 1)) (add1 10)").value);
+    // Multi-arg
+    assert_eq!(Ok(Some(DataType::Integer(30))),
+        run("(define (mul3 x y z) (* x y z)) (mul3 2 3 5)").value);
+    // No args
+    assert_eq!(Ok(Some(DataType::Integer(42))),
+        run("(define (answer) 42) (answer)").value);
+    // Multi-expression body
+    assert_eq!(Ok(Some(DataType::Integer(7))),
+        run("(define (f x) (display x) (+ x 1)) (f 6)").value);
+}
+
+#[test]
+fn let_star_test() {
+    // Sequential bindings — each sees previous
+    assert_eq!(Ok(Some(DataType::Integer(3))),
+        run("(let* ((x 1) (y (+ x 1))) (+ x y))").value);
+    // Three levels
+    assert_eq!(Ok(Some(DataType::Integer(6))),
+        run("(let* ((a 1) (b (+ a 1)) (c (+ b 1))) (+ a b c))").value);
+}
+
+#[test]
+fn letrec_test() {
+    // Mutual recursion via letrec
+    assert_eq!(Ok(Some(DataType::Bool(true))),
+        run("(letrec ((even? (lambda (n) (if (= n 0) #t (odd? (- n 1))))) (odd? (lambda (n) (if (= n 0) #f (even? (- n 1)))))) (even? 10))").value);
+    // Self-recursion
+    assert_eq!(Ok(Some(DataType::Integer(120))),
+        run("(letrec ((fact (lambda (n) (if (= n 0) 1 (* n (fact (- n 1))))))) (fact 5))").value);
+}
+
+#[test]
+fn and_or_test() {
+    // and — returns last truthy
+    assert_eq!(Ok(Some(DataType::Integer(3))), run("(and 1 2 3)").value);
+    // and — short-circuits on #f
+    assert_eq!(Ok(Some(DataType::Bool(false))), run("(and 1 #f 3)").value);
+    // and — no args → #t
+    assert_eq!(Ok(Some(DataType::Bool(true))), run("(and)").value);
+    // or — returns first truthy
+    assert_eq!(Ok(Some(DataType::Integer(3))), run("(or #f #f 3)").value);
+    // or — all false → last value
+    assert_eq!(Ok(Some(DataType::Bool(false))), run("(or #f #f)").value);
+    // or — no args → #f
+    assert_eq!(Ok(Some(DataType::Bool(false))), run("(or)").value);
+    // and/or combined
+    assert_eq!(Ok(Some(DataType::Integer(5))),
+        run("(or (and #t 5) 10)").value);
+}
+
+#[test]
+fn list_utils_test() {
+    // reverse
+    assert_eq!(Ok(Some(DataType::List(vec![
+        DataType::Integer(3), DataType::Integer(2), DataType::Integer(1)]))),
+        run("(reverse (list 1 2 3))").value);
+    // list-ref
+    assert_eq!(Ok(Some(DataType::Integer(2))),
+        run("(list-ref (list 1 2 3) 1)").value);
+    // list-tail
+    assert_eq!(Ok(Some(DataType::List(vec![DataType::Integer(3)]))),
+        run("(list-tail (list 1 2 3) 2)").value);
+    // member
+    assert_eq!(Ok(Some(DataType::List(vec![DataType::Integer(2), DataType::Integer(3)]))),
+        run("(member 2 (list 1 2 3))").value);
+    // member — not found
+    assert_eq!(Ok(Some(DataType::Bool(false))),
+        run("(member 5 (list 1 2 3))").value);
+    // assoc
+    assert_eq!(Ok(Some(DataType::List(vec![DataType::Symbol("b".to_string()), DataType::Integer(2)]))),
+        run("(assoc (quote b) (list (list (quote a) 1) (list (quote b) 2)))").value);
+    // assq — eq? based
+    assert_eq!(Ok(Some(DataType::List(vec![DataType::Symbol("a".to_string()), DataType::Integer(1)]))),
+        run("(assq (quote a) (list (list (quote a) 1) (list (quote b) 2)))").value);
+}
+
+#[test]
+fn string_utils_test() {
+    // string=?
+    assert_eq!(Ok(Some(DataType::Bool(true))), run("(string=? \"abc\" \"abc\")").value);
+    assert_eq!(Ok(Some(DataType::Bool(false))), run("(string=? \"abc\" \"abd\")").value);
+    // string<?
+    assert_eq!(Ok(Some(DataType::Bool(true))), run("(string<? \"abc\" \"abd\")").value);
+    // substring
+    assert_eq!(Ok(Some(DataType::String("el".to_string()))),
+        run("(substring \"hello\" 1 3)").value);
+    // string-ref (returns 1-char string since no char type)
+    assert_eq!(Ok(Some(DataType::String("h".to_string()))),
+        run("(string-ref \"hello\" 0)").value);
+    // string->list
+    assert_eq!(Ok(Some(DataType::List(vec![
+        DataType::String("a".to_string()),
+        DataType::String("b".to_string()),
+        DataType::String("c".to_string())]))),
+        run("(string->list \"abc\")").value);
+    // list->string
+    assert_eq!(Ok(Some(DataType::String("abc".to_string()))),
+        run("(list->string (list \"a\" \"b\" \"c\"))").value);
+    // make-string
+    assert_eq!(Ok(Some(DataType::String("xxx".to_string()))),
+        run("(make-string 3 \"x\")").value);
+}
+
+#[test]
+fn math_functions_test() {
+    // sqrt — always float
+    assert_eq!(Ok(Some(DataType::Float(4.0))), run("(sqrt 16)").value);
+    // expt — integer result for integer base/exp
+    assert_eq!(Ok(Some(DataType::Integer(1024))), run("(expt 2 10)").value);
+    // expt — float result for non-integer
+    assert_eq!(Ok(Some(DataType::Float(8.0))), run("(expt 2.0 3)").value);
+    // floor
+    assert_eq!(Ok(Some(DataType::Integer(3))), run("(floor 3.7)").value);
+    // ceiling
+    assert_eq!(Ok(Some(DataType::Integer(4))), run("(ceiling 3.2)").value);
+    // round
+    assert_eq!(Ok(Some(DataType::Integer(4))), run("(round 3.5)").value);
+    // truncate
+    assert_eq!(Ok(Some(DataType::Integer(3))), run("(truncate 3.9)").value);
+    // gcd
+    assert_eq!(Ok(Some(DataType::Integer(6))), run("(gcd 12 18)").value);
+    // lcm
+    assert_eq!(Ok(Some(DataType::Integer(12))), run("(lcm 4 6)").value);
+}
+
+#[test]
+fn error_procedure_test() {
+    // error raises RuntimeError
+    let result = run("(error \"something went wrong\")");
+    assert!(result.value.is_err(), "error should return Err");
+    // error with irritants
+    let result2 = run("(error \"bad value\" 42)");
+    assert!(result2.value.is_err(), "error with irritants should return Err");
+}
+
+#[test]
 fn tricky_test1 () {
 
     // Testing the case that the 1st element is a children and it returns a function/lambda after an evaluation

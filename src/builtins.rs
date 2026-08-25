@@ -831,5 +831,328 @@ pub fn setup() -> HashMap<String, DataType> {
         }
     }))));
 
+    // --- List utilities ---
+
+    map.insert("reverse".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("reverse requires 1 argument".into()); }
+        if let Some(DataType::List(ref l)) = vec.get(0) {
+            Ok(Some(DataType::List(l.iter().rev().cloned().collect())))
+        } else {
+            Err("reverse requires a list".into())
+        }
+    }))));
+
+    map.insert("list-ref".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 2 { return Err("list-ref requires 2 arguments".into()); }
+        if let (Some(DataType::List(ref l)), Some(idx)) = (vec.get(0), vec.get(1)) {
+            let i = idx.as_f64().unwrap() as usize;
+            if i < l.len() {
+                Ok(Some(l[i].clone()))
+            } else {
+                Err("list-ref: index out of bounds".into())
+            }
+        } else {
+            Err("list-ref requires a list and an index".into())
+        }
+    }))));
+
+    map.insert("list-tail".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 2 { return Err("list-tail requires 2 arguments".into()); }
+        if let (Some(DataType::List(ref l)), Some(idx)) = (vec.get(0), vec.get(1)) {
+            let i = idx.as_f64().unwrap() as usize;
+            if i <= l.len() {
+                Ok(Some(DataType::List(l[i..].to_vec())))
+            } else {
+                Err("list-tail: index out of bounds".into())
+            }
+        } else {
+            Err("list-tail requires a list and an index".into())
+        }
+    }))));
+
+    // member / memq / memv — find element in list, return tail from match
+    let make_member = |cmp: fn(&DataType, &DataType) -> bool, name: &str| -> DataType {
+        let name = name.to_string();
+        DataType::Proc(Function(Rc::new(move |vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+            if vec.len() != 2 { return Err(SchemeError::RuntimeError(format!("{} requires 2 arguments", name))); }
+            if let (Some(obj), Some(DataType::List(ref l))) = (vec.get(0), vec.get(1)) {
+                for (i, item) in l.iter().enumerate() {
+                    if cmp(obj, item) {
+                        return Ok(Some(DataType::List(l[i..].to_vec())));
+                    }
+                }
+                Ok(Some(DataType::Bool(false)))
+            } else {
+                Err(SchemeError::RuntimeError(format!("{} requires an object and a list", name)))
+            }
+        })))
+    };
+    map.insert("member".to_string(), make_member(|a, b| a == b, "member"));
+    map.insert("memq".to_string(), make_member(|a, b| {
+        match (a, b) {
+            (DataType::Symbol(ref x), DataType::Symbol(ref y)) => x == y,
+            (DataType::Integer(x), DataType::Integer(y)) => x == y,
+            (DataType::Bool(x), DataType::Bool(y)) => x == y,
+            _ => false,
+        }
+    }, "memq"));
+    map.insert("memv".to_string(), make_member(|a, b| {
+        match (a, b) {
+            (DataType::Symbol(ref x), DataType::Symbol(ref y)) => x == y,
+            (DataType::Integer(x), DataType::Integer(y)) => x == y,
+            (DataType::Float(x), DataType::Float(y)) => x == y,
+            (DataType::Bool(x), DataType::Bool(y)) => x == y,
+            _ => false,
+        }
+    }, "memv"));
+
+    // assoc / assq / assv — find pair by key in association list
+    let make_assoc = |cmp: fn(&DataType, &DataType) -> bool, name: &str| -> DataType {
+        let name = name.to_string();
+        DataType::Proc(Function(Rc::new(move |vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+            if vec.len() != 2 { return Err(SchemeError::RuntimeError(format!("{} requires 2 arguments", name))); }
+            if let (Some(key), Some(DataType::List(ref l))) = (vec.get(0), vec.get(1)) {
+                for pair in l.iter() {
+                    if let DataType::List(ref p) = pair {
+                        if let Some(k) = p.get(0) {
+                            if cmp(key, k) {
+                                return Ok(Some(pair.clone()));
+                            }
+                        }
+                    }
+                }
+                Ok(Some(DataType::Bool(false)))
+            } else {
+                Err(SchemeError::RuntimeError(format!("{} requires a key and an association list", name)))
+            }
+        })))
+    };
+    map.insert("assoc".to_string(), make_assoc(|a, b| a == b, "assoc"));
+    map.insert("assq".to_string(), make_assoc(|a, b| {
+        match (a, b) {
+            (DataType::Symbol(ref x), DataType::Symbol(ref y)) => x == y,
+            (DataType::Integer(x), DataType::Integer(y)) => x == y,
+            (DataType::Bool(x), DataType::Bool(y)) => x == y,
+            _ => false,
+        }
+    }, "assq"));
+    map.insert("assv".to_string(), make_assoc(|a, b| {
+        match (a, b) {
+            (DataType::Symbol(ref x), DataType::Symbol(ref y)) => x == y,
+            (DataType::Integer(x), DataType::Integer(y)) => x == y,
+            (DataType::Float(x), DataType::Float(y)) => x == y,
+            (DataType::Bool(x), DataType::Bool(y)) => x == y,
+            _ => false,
+        }
+    }, "assv"));
+
+    // --- String utilities ---
+
+    map.insert("string=?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 2 { return Err("string=? requires 2 arguments".into()); }
+        if let (Some(DataType::String(ref a)), Some(DataType::String(ref b))) = (vec.get(0), vec.get(1)) {
+            Ok(Some(DataType::Bool(a == b)))
+        } else {
+            Err("string=? requires strings".into())
+        }
+    }))));
+
+    map.insert("string<?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 2 { return Err("string<? requires 2 arguments".into()); }
+        if let (Some(DataType::String(ref a)), Some(DataType::String(ref b))) = (vec.get(0), vec.get(1)) {
+            Ok(Some(DataType::Bool(a < b)))
+        } else {
+            Err("string<? requires strings".into())
+        }
+    }))));
+
+    map.insert("string>?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 2 { return Err("string>? requires 2 arguments".into()); }
+        if let (Some(DataType::String(ref a)), Some(DataType::String(ref b))) = (vec.get(0), vec.get(1)) {
+            Ok(Some(DataType::Bool(a > b)))
+        } else {
+            Err("string>? requires strings".into())
+        }
+    }))));
+
+    map.insert("substring".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() < 3 { return Err("substring requires 3 arguments".into()); }
+        if let (Some(DataType::String(ref s)), Some(start), Some(end)) = (vec.get(0), vec.get(1), vec.get(2)) {
+            let st = start.as_f64().unwrap() as usize;
+            let en = end.as_f64().unwrap() as usize;
+            if en > s.len() || st > en {
+                return Err("substring: indices out of bounds".into());
+            }
+            Ok(Some(DataType::String(s[st..en].to_string())))
+        } else {
+            Err("substring requires a string and two indices".into())
+        }
+    }))));
+
+    map.insert("string-ref".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 2 { return Err("string-ref requires 2 arguments".into()); }
+        if let (Some(DataType::String(ref s)), Some(idx)) = (vec.get(0), vec.get(1)) {
+            let i = idx.as_f64().unwrap() as usize;
+            if i < s.len() {
+                Ok(Some(DataType::String(s[i..i+1].to_string())))
+            } else {
+                Err("string-ref: index out of bounds".into())
+            }
+        } else {
+            Err("string-ref requires a string and an index".into())
+        }
+    }))));
+
+    map.insert("string->list".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("string->list requires 1 argument".into()); }
+        if let Some(DataType::String(ref s)) = vec.get(0) {
+            // No char type — return list of 1-char strings
+            Ok(Some(DataType::List(s.chars().map(|c| DataType::String(c.to_string())).collect())))
+        } else {
+            Err("string->list requires a string".into())
+        }
+    }))));
+
+    map.insert("list->string".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("list->string requires 1 argument".into()); }
+        if let Some(DataType::List(ref l)) = vec.get(0) {
+            let mut result = String::new();
+            for item in l.iter() {
+                if let DataType::String(ref s) = item {
+                    result.push_str(s);
+                } else {
+                    return Err("list->string requires a list of strings".into());
+                }
+            }
+            Ok(Some(DataType::String(result)))
+        } else {
+            Err("list->string requires a list".into())
+        }
+    }))));
+
+    map.insert("make-string".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() < 1 { return Err("make-string requires at least 1 argument".into()); }
+        let n = vec.get(0).map(|d| d.as_f64().unwrap() as usize).unwrap_or(0);
+        let fill = vec.get(1).and_then(|d| if let DataType::String(ref s) = d { s.chars().next() } else { None }).unwrap_or(' ');
+        Ok(Some(DataType::String(fill.to_string().repeat(n))))
+    }))));
+
+    // --- Math functions ---
+
+    map.insert("sqrt".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("sqrt requires 1 argument".into()); }
+        if let Some(n) = vec.get(0) {
+            if !n.is_number() { return Err("sqrt requires a number".into()); }
+            Ok(Some(DataType::Float(n.as_f64().unwrap().sqrt())))
+        } else {
+            Err("sqrt requires a number".into())
+        }
+    }))));
+
+    map.insert("expt".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 2 { return Err("expt requires 2 arguments".into()); }
+        if let (Some(base), Some(exp)) = (vec.get(0), vec.get(1)) {
+            if !base.is_number() || !exp.is_number() { return Err("expt requires numbers".into()); }
+            let b = base.as_f64().unwrap();
+            let e = exp.as_f64().unwrap();
+            let result = b.powf(e);
+            // Return Integer if both are integers and result is whole
+            if base.is_integer() && exp.is_integer() && result.fract() == 0.0 && result.is_finite() {
+                Ok(Some(DataType::Integer(result as i64)))
+            } else {
+                Ok(Some(DataType::Float(result)))
+            }
+        } else {
+            Err("expt requires numbers".into())
+        }
+    }))));
+
+    map.insert("floor".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("floor requires 1 argument".into()); }
+        if let Some(n) = vec.get(0) {
+            if !n.is_number() { return Err("floor requires a number".into()); }
+            let f = n.as_f64().unwrap().floor();
+            if n.is_integer() { Ok(Some(DataType::Integer(f as i64))) } else { Ok(Some(DataType::Integer(f as i64))) }
+        } else { Err("floor requires a number".into()) }
+    }))));
+
+    map.insert("ceiling".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("ceiling requires 1 argument".into()); }
+        if let Some(n) = vec.get(0) {
+            if !n.is_number() { return Err("ceiling requires a number".into()); }
+            Ok(Some(DataType::Integer(n.as_f64().unwrap().ceil() as i64)))
+        } else { Err("ceiling requires a number".into()) }
+    }))));
+
+    map.insert("round".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("round requires 1 argument".into()); }
+        if let Some(n) = vec.get(0) {
+            if !n.is_number() { return Err("round requires a number".into()); }
+            Ok(Some(DataType::Integer(n.as_f64().unwrap().round() as i64)))
+        } else { Err("round requires a number".into()) }
+    }))));
+
+    map.insert("truncate".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.len() != 1 { return Err("truncate requires 1 argument".into()); }
+        if let Some(n) = vec.get(0) {
+            if !n.is_number() { return Err("truncate requires a number".into()); }
+            Ok(Some(DataType::Integer(n.as_f64().unwrap().trunc() as i64)))
+        } else { Err("truncate requires a number".into()) }
+    }))));
+
+    map.insert("gcd".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.is_empty() { return Ok(Some(DataType::Integer(0))); }
+        let mut result: i64 = 0;
+        for arg in vec.iter() {
+            if !arg.is_number() { return Err("gcd requires numbers".into()); }
+            let mut a = arg.as_f64().unwrap() as i64;
+            if a < 0 { a = -a; }
+            let mut b = result;
+            while b != 0 {
+                let t = b;
+                b = a % b;
+                a = t;
+            }
+            result = a;
+        }
+        Ok(Some(DataType::Integer(result)))
+    }))));
+
+    map.insert("lcm".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.is_empty() { return Ok(Some(DataType::Integer(1))); }
+        let mut result: i64 = 1;
+        for arg in vec.iter() {
+            if !arg.is_number() { return Err("lcm requires numbers".into()); }
+            let a = arg.as_f64().unwrap() as i64;
+            if a == 0 { return Ok(Some(DataType::Integer(0))); }
+            let mut g = result;
+            let mut b = a.abs();
+            while b != 0 {
+                let t = b;
+                b = g % b;
+                g = t;
+            }
+            result = (result.abs() / g) * a.abs();
+        }
+        Ok(Some(DataType::Integer(result)))
+    }))));
+
+    // --- Error handling ---
+
+    map.insert("error".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: Rc<RefCell<Env>>| {
+        if vec.is_empty() { return Err(SchemeError::RuntimeError("error".to_string())); }
+        let mut msg = String::new();
+        if let Some(DataType::String(ref s)) = vec.get(0) {
+            msg.push_str(s);
+        } else {
+            msg.push_str("error");
+        }
+        for arg in vec.iter().skip(1) {
+            msg.push(' ');
+            msg.push_str(&datatype2str(arg));
+        }
+        Err(SchemeError::RuntimeError(msg))
+    }))));
+
     return map;
 }

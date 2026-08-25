@@ -94,6 +94,31 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                         }
                     }
                     "define" => {
+                        // Function shorthand: (define (f args...) body...)
+                        // → (define f (lambda (args...) body...))
+                        if let Some(&AST::Children(ref sig)) = s1 {
+                            if let Some(&AST::Symbol(ref fname)) = sig.get(0) {
+                                // Build lambda AST: (lambda (params...) body...)
+                                let mut lambda_ast = vec![AST::Symbol("lambda".to_string())];
+                                // Params are sig[1..] wrapped in a Children
+                                let params = AST::Children(sig[1..].to_vec());
+                                lambda_ast.push(params);
+                                // Body is list[2..]
+                                for expr in &list[2..] {
+                                    lambda_ast.push(expr.clone());
+                                }
+                                let lambda_expr = AST::Children(lambda_ast);
+                                // Evaluate the lambda
+                                let data_option = eval(Some(lambda_expr), env.clone());
+                                if let Ok(Some(DataType::Lambda(ref p))) = data_option {
+                                    let env_borrow_mut = env.borrow_mut();
+                                    env_borrow_mut.local.borrow_mut().insert(fname.clone(), DataType::Lambda(p.clone()));
+                                } else if let Err(e) = data_option {
+                                    return Err(e);
+                                }
+                                return Ok(None);
+                            }
+                        }
                         if let (Some(&AST::Symbol(ref s1)), Some(&ref a2)) = (s1, s2) {
                             match a2.clone() {
                                 AST::Integer(i) => {
@@ -313,6 +338,160 @@ pub fn eval(mut ast_option: Option<AST>, mut env: Rc<RefCell<Env>>) -> Result<Op
                         } else {
                             return Err("let requires bindings and a body".into());
                         }
+                    }
+                    "let*" => {
+                        // (let* ((var init) ...) body...)
+                        // Sequential bindings: each init sees previous bindings
+                        if let (Some(&AST::Children(ref bindings)), Some(_)) = (s1, s2) {
+                            let body_exprs = &list[2..];
+                            if body_exprs.is_empty() {
+                                return Err("let* requires a body".into());
+                            }
+                            // Build env chain: each binding gets its own env layer
+                            let mut current_env = env.clone();
+                            for binding in bindings.iter() {
+                                if let AST::Children(ref pair) = binding {
+                                    if let (Some(&AST::Symbol(ref name)), Some(init)) = (pair.get(0), pair.get(1)) {
+                                        match eval(Some(init.clone()), current_env.clone()) {
+                                            Ok(Some(val)) => {
+                                                let mut local = HashMap::new();
+                                                local.insert(name.clone(), val);
+                                                let new_env = Env {
+                                                    local: Box::new(RefCell::new(local)),
+                                                    parent: Some(Box::new(current_env)),
+                                                };
+                                                current_env = Rc::new(RefCell::new(new_env));
+                                            }
+                                            Ok(None) => {
+                                                let mut local = HashMap::new();
+                                                local.insert(name.clone(), DataType::Bool(false));
+                                                let new_env = Env {
+                                                    local: Box::new(RefCell::new(local)),
+                                                    parent: Some(Box::new(current_env)),
+                                                };
+                                                current_env = Rc::new(RefCell::new(new_env));
+                                            }
+                                            Err(e) => return Err(e),
+                                        }
+                                    } else {
+                                        return Err("let* binding must be (name init)".into());
+                                    }
+                                } else {
+                                    return Err("let* bindings must be (name init) pairs".into());
+                                }
+                            }
+                            // Build body as implicit begin
+                            let body_ast = if body_exprs.len() == 1 {
+                                body_exprs[0].clone()
+                            } else {
+                                AST::Children(
+                                    std::iter::once(AST::Symbol("begin".to_string()))
+                                        .chain(body_exprs.iter().cloned())
+                                        .collect()
+                                )
+                            };
+                            // TAIL
+                            ast_option = Some(body_ast);
+                            env = current_env;
+                            continue;
+                        } else {
+                            return Err("let* requires bindings and a body".into());
+                        }
+                    }
+                    "letrec" => {
+                        // (letrec ((var init) ...) body...)
+                        // Recursive bindings: all vars visible to all inits
+                        if let (Some(&AST::Children(ref bindings)), Some(_)) = (s1, s2) {
+                            let body_exprs = &list[2..];
+                            if body_exprs.is_empty() {
+                                return Err("letrec requires a body".into());
+                            }
+                            // Create env with all names pre-bound to unspecified
+                            let mut local = HashMap::new();
+                            for binding in bindings.iter() {
+                                if let AST::Children(ref pair) = binding {
+                                    if let Some(&AST::Symbol(ref name)) = pair.get(0) {
+                                        local.insert(name.clone(), DataType::Bool(false));
+                                    }
+                                }
+                            }
+                            let letrec_env = Env {
+                                local: Box::new(RefCell::new(local)),
+                                parent: Some(Box::new(env.clone())),
+                            };
+                            let letrec_env_rc = Rc::new(RefCell::new(letrec_env));
+                            // Now evaluate each init in this env and update bindings
+                            for binding in bindings.iter() {
+                                if let AST::Children(ref pair) = binding {
+                                    if let (Some(&AST::Symbol(ref name)), Some(init)) = (pair.get(0), pair.get(1)) {
+                                        match eval(Some(init.clone()), letrec_env_rc.clone()) {
+                                            Ok(Some(val)) => {
+                                                letrec_env_rc.borrow_mut().local.borrow_mut().insert(name.clone(), val);
+                                            }
+                                            Ok(None) => {}
+                                            Err(e) => return Err(e),
+                                        }
+                                    }
+                                }
+                            }
+                            // Build body as implicit begin
+                            let body_ast = if body_exprs.len() == 1 {
+                                body_exprs[0].clone()
+                            } else {
+                                AST::Children(
+                                    std::iter::once(AST::Symbol("begin".to_string()))
+                                        .chain(body_exprs.iter().cloned())
+                                        .collect()
+                                )
+                            };
+                            // TAIL
+                            ast_option = Some(body_ast);
+                            env = letrec_env_rc;
+                            continue;
+                        } else {
+                            return Err("letrec requires bindings and a body".into());
+                        }
+                    }
+                    "and" => {
+                        // (and expr...) — short-circuit, returns last truthy or first #f
+                        if list.len() == 1 {
+                            return Ok(Some(DataType::Bool(true)));
+                        }
+                        let mut result = DataType::Bool(true);
+                        for i in 1..list.len() {
+                            let is_last = i == list.len() - 1;
+                            match eval(Some(list[i].clone()), env.clone())? {
+                                Some(DataType::Bool(false)) => return Ok(Some(DataType::Bool(false))),
+                                Some(val) => {
+                                    if is_last {
+                                        result = val;
+                                    }
+                                    // Continue evaluating
+                                }
+                                None => {
+                                    if is_last {
+                                        return Ok(None);
+                                    }
+                                }
+                            }
+                        }
+                        return Ok(Some(result));
+                    }
+                    "or" => {
+                        // (or expr...) — short-circuit, returns first truthy or last #f
+                        if list.len() == 1 {
+                            return Ok(Some(DataType::Bool(false)));
+                        }
+                        for i in 1..list.len() - 1 {
+                            match eval(Some(list[i].clone()), env.clone())? {
+                                Some(DataType::Bool(false)) => {} // continue
+                                Some(val) => return Ok(Some(val)),
+                                None => {} // continue
+                            }
+                        }
+                        // TAIL: last expression
+                        ast_option = Some(list[list.len() - 1].clone());
+                        continue;
                     }
                     "cond" => {
                         // (cond (test expr...) ... (else expr...))
