@@ -39,7 +39,7 @@ Legend:
 | Variables | ✅ | Lexical scoping via environment chains |
 | `define` (top-level) | ✅ | `(define x 5)` |
 | `define` (internal) | ✅ | `(lambda () (define x 5) x)` |
-| `define` (function shorthand) | ❌ | `(define (f x) ...)` not supported — must use `(define f (lambda (x) ...))` |
+| `define` (function shorthand) | ✅ | `(define (f x) ...)` → `(define f (lambda (x) ...))` |
 | `set!` | ✅ | Mutation of existing bindings |
 | Lexical scoping | ✅ | Nested env with parent chain |
 | Tail calls | ✅ | TCO via trampoline-style eval loop |
@@ -62,10 +62,11 @@ Legend:
 | `real?` `rational?` `complex?` | ❌ | |
 | `exact?` `inexact?` | ❌ | No exact/inexact distinction |
 | `exact->inexact` `inexact->exact` | ❌ | |
-| `gcd` `lcm` | ❌ | |
-| `floor` `ceiling` `truncate` `round` | ❌ | |
-| `sqrt` `exp` `log` `sin` `cos` `tan` | ❌ | |
-| `expt` | ❌ | |
+| `gcd` `lcm` | ✅ | |
+| `floor` `ceiling` `truncate` `round` | ✅ | Return Integer |
+| `sqrt` | ✅ | Always returns Float |
+| `expt` | ✅ | Integer if both args integer and result is whole |
+| `exp` `log` `sin` `cos` `tan` | ❌ | |
 | `atan` `asin` `acos` | ❌ | |
 | `string->number` `number->string` | ❌ | |
 | BigInt / arbitrary precision | ❌ | i64 only |
@@ -84,10 +85,10 @@ Legend:
 | `null?` | ✅ | |
 | `list?` | ✅ | |
 | `pair?` | ✅ | |
-| `reverse` | ❌ | |
-| `list-ref` `list-tail` | ❌ | |
-| `member` `memq` `memv` | ❌ | |
-| `assoc` `assq` `assv` | ❌ | |
+| `reverse` | ✅ | |
+| `list-ref` `list-tail` | ✅ | |
+| `member` `memq` `memv` | ✅ | |
+| `assoc` `assq` `assv` | ✅ | |
 | `set-car!` `set-cdr!` | ❌ | Pairs are not mutable |
 | `cadr` `caddr` `cddr` etc. | ❌ | Only `car`/`cdr` |
 | Improper lists (dotted pairs) | ❌ | `(cons 1 2)` creates a 2-element list, not a pair |
@@ -104,12 +105,13 @@ Legend:
 | `string-append` | ✅ | |
 | `string->symbol` | ✅ | |
 | `symbol->string` | ✅ | |
-| `string=?` `string<?` `string>?` | ❌ | |
-| `string->list` `list->string` | ❌ | |
-| `substring` | ❌ | |
-| `string-ref` `string-set!` | ❌ | |
+| `string=?` `string<?` `string>?` | ✅ | |
+| `string->list` `list->string` | ✅ | Returns list of 1-char strings (no char type) |
+| `substring` | ✅ | |
+| `string-ref` | ✅ | Returns 1-char string (no char type) |
+| `string-set!` | ❌ | Strings are not mutable |
 | `string-copy` | ❌ | |
-| `make-string` | ❌ | |
+| `make-string` | ✅ | |
 | `char?` `char->integer` `integer->char` | ❌ | No character type |
 
 ---
@@ -135,13 +137,13 @@ Legend:
 | `case` | ✅ | With `else` |
 | `when` | ✅ | Multi-expression body |
 | `unless` | ✅ | Multi-expression body |
-| `and` | ❌ | |
-| `or` | ❌ | |
+| `and` | ✅ | Short-circuit, last in tail position |
+| `or` | ✅ | Short-circuit, last in tail position |
 | `begin` | ✅ | |
 | `do` | ✅ | Full R5RS syntax |
 | `let` | ✅ | Multi-expression body |
-| `let*` | ❌ | |
-| `letrec` | ❌ | |
+| `let*` | ✅ | Sequential bindings |
+| `letrec` | ✅ | Recursive bindings for mutual recursion |
 | Named `let` | ✅ | `(let loop ((i 0)) ...)` |
 | `quasiquote` / `unquote` / `unquote-splicing` | ✅ | With shorthand syntax |
 | `apply` | ✅ | |
@@ -220,7 +222,7 @@ Legend:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| `error` | ❌ | No error-raising procedure |
+| `error` | ✅ | Raises RuntimeError with message + irritants |
 | `assert` | ❌ | |
 | `raise` `with-exception-handler` | ❌ | No condition system (R6RS+) |
 
@@ -231,22 +233,24 @@ Legend:
 | Category | Supported | Partial | Not Supported |
 |----------|-----------|---------|---------------|
 | Lexical | 9 | 1 | 5 |
-| Basic Concepts | 7 | 0 | 1 |
-| Numbers | 14 | 0 | 20 |
-| Lists & Pairs | 8 | 0 | 11 |
-| Symbols & Strings | 5 | 0 | 10 |
+| Basic Concepts | 8 | 0 | 0 |
+| Numbers | 20 | 0 | 14 |
+| Lists & Pairs | 14 | 0 | 5 |
+| Symbols & Strings | 12 | 0 | 3 |
 | Booleans & Predicates | 4 | 0 | 0 |
-| Control Flow | 12 | 1 | 10 |
+| Control Flow | 16 | 1 | 6 |
 | I/O | 3 | 0 | 7 |
 | Vectors | 0 | 0 | 6 |
 | Evaluation | 0 | 0 | 5 |
 | Macros | 0 | 0 | 5 |
 | Higher-Order | 1 | 1 | 2 |
-| Error Handling | 0 | 0 | 3 |
-| **Total** | **63** | **3** | **85** |
+| Error Handling | 1 | 0 | 2 |
+| **Total** | **88** | **3** | **61** |
 
-**Overall**: ~43% of R5RS features supported. The interpreter covers the core
+**Overall**: ~58% of R5RS features supported. The interpreter covers the core
 subset needed for most programs: lexical scoping, closures, tail calls, the
-essential list operations, conditionals, `let`/`lambda`/`define`, and
-quasiquote. The main gaps are: no character type, no vectors, no macro system,
-no continuations, and limited numeric/string libraries.
+essential list operations, conditionals, `let`/`let*`/`letrec`/named let,
+`lambda`/`define` (including function shorthand), `and`/`or`, quasiquote,
+`do` loops, math functions, string utilities, and `error`. The main gaps are:
+no character type, no vectors, no macro system, no continuations, and no
+exact/inexact numeric distinction.

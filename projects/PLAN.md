@@ -4,12 +4,13 @@
 
 A multi-phase effort to refactor, fix, and extend the scheme-rs Scheme
 interpreter written in Rust. What began as a 3-phase, 14-task modernization
-project grew into 10 phases and 43 tasks, covering code quality, bug fixes,
+project grew into 11 phases and 51 tasks, covering code quality, bug fixes,
 module architecture, R5RS feature implementation, tail-call optimization,
 CI migration, numeric tower improvements, performance optimization, and
 more R5RS features.
 
-**Status**: All 10 phases complete. 57/57 tests pass. Zero compiler warnings.
+**Status**: All 11 phases complete. 65/65 tests pass. Zero compiler warnings.
+~58% R5RS feature coverage (88 supported, 3 partial, 61 not supported).
 
 ## Architecture Decisions
 
@@ -47,6 +48,7 @@ more R5RS features.
 | 8 | Numeric Tower | 30-33 | 51 | Integer/Float split with promotion rules |
 | 9 | Examples & Performance | 34-37 | 52 | 5 examples, 6 benchmarks, ~2x speedup |
 | 10 | Bug Fixes + R5RS | 38-43 | 57 | Multi-expr bodies, internal define, quasiquote, named let, do loops |
+| 11 | R5RS Core Gaps | 44-51 | 65 | define shorthand, let*/letrec, and/or, list utils, string utils, math, error |
 
 ## Detailed Phase List
 
@@ -169,6 +171,30 @@ more R5RS features.
 
 **Checkpoint**: 57 tests pass, 5 examples updated, zero warnings.
 
+### Phase 11: R5RS Core Gaps (`r5rs-3`) — ✅ Complete
+
+> Spec: `projects/SPEC_PHASE11.md`
+
+**Special forms**:
+- [x] Task 44: `define` function shorthand — `(define (f x) body...)` → `(define f (lambda (x) body...))`
+- [x] Task 45: `let*` — sequential bindings where each init sees previous bindings
+- [x] Task 46: `letrec` — recursive bindings for mutual recursion
+- [x] Task 47: `and` / `or` — short-circuit boolean operators with tail position
+
+**List utilities**:
+- [x] Task 48: `reverse`, `list-ref`, `list-tail`, `member`/`memq`/`memv`, `assoc`/`assq`/`assv`
+
+**String utilities**:
+- [x] Task 49: `string=?`, `string<?`, `string>?`, `substring`, `string-ref`, `string->list`, `list->string`, `make-string`
+
+**Math functions**:
+- [x] Task 50: `sqrt`, `expt`, `floor`, `ceiling`, `round`, `truncate`, `gcd`, `lcm`
+
+**Error handling**:
+- [x] Task 51: `error` procedure — raises RuntimeError with message + irritants
+
+**Checkpoint**: 65 tests pass, ~58% R5RS coverage (was ~43%), zero warnings.
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation | Outcome |
@@ -190,15 +216,16 @@ These items are documented in `projects/R5RS_SUPPORT.md` and `projects/TODO.md` 
 - **BigInt** — integers are i64 only, would need `num-bigint` dependency
 - **Character type** — `#\a` syntax, `char?`, `char->integer`
 - **Vectors** — `#(...)` syntax, vector operations
-- **`let*` / `letrec`** — sequential and recursive binding forms
-- **`and` / `or`** — short-circuit boolean operators
-- **`define` function shorthand** — `(define (f x) ...)` syntax
-- **Extended string library** — `string=?`, `substring`, `string->list`, etc.
-- **Extended list library** — `reverse`, `member`, `assoc`, `list-ref`, `list-tail`
-- **Math functions** — `sqrt`, `exp`, `log`, `sin`, `cos`, `tan`, `expt`, `floor`, `ceiling`, `round`, `truncate`
-- **`error` procedure** — raising errors from Scheme code
+- **Transcendental math** — `exp`, `log`, `sin`, `cos`, `tan`, `atan`, `asin`, `acos`
+- **`string->number` / `number->string`** — numeric/string conversion
+- **`integer?` / `real?` / `rational?` / `complex?`** — numeric type predicates
+- **`exact?` / `inexact?`** — exact/inexact distinction
 - **`eval` procedure** — exposing eval to Scheme code
 - **I/O ports** — `read`, `write`, `open-input-file`, etc.
+- **`for-each`** — single-list iteration for side effects
+- **`cadr` / `caddr` / `cddr` etc.** — composition of car/cdr
+- **`set-car!` / `set-cdr!`** — mutable pairs
+- **Dotted pairs** — `(cons 1 2)` should create a pair, not a 2-element list
 
 ## Related Documents
 
