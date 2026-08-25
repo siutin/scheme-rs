@@ -140,10 +140,10 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                     }
                     "lambda" => {
                         debug!("lambda-expression");
-                        if let (Some(&AST::Children(ref args)), Some(&AST::Children(ref body))) = (s1, s2) {
+                        if let (Some(&AST::Children(ref args)), Some(body_ast)) = (s1, s2) {
                             debug!("ENV: {:?}", env);
                             debug!("args: {:?}", args);
-                            debug!("body: {:?}", body);
+                            debug!("body: {:?}", body_ast);
 
                             // convert args AST to Datatype symbol
                             let args_result: Result<Vec<_>, SchemeError> = args.iter().map(|ref arg|
@@ -167,8 +167,10 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                             };
 
                             debug!("procedure_env: {:?}", procedure_env);
+                            // Body can be a single expression or a list of expressions.
+                            // Store as-is; eval handles both AST::Children and single AST nodes.
                             let procedure = Procedure {
-                                body: AST::Children(body.clone()),
+                                body: body_ast.clone(),
                                 params: args_meta,
                                 env: Rc::new(RefCell::new(procedure_env))
                             };
@@ -202,7 +204,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                 match prepare_arguments(slice, env.clone()) {
                                     Ok(args) => {
                                         debug!("first elm symbol - procedure params: {:?}", p.params);
-                                        let procedure_local = p.env.borrow_mut().local.clone();
+                                        let procedure_local = Box::new(RefCell::new(HashMap::new()));
 
                                         for (name_ref, value_ref) in p.params.iter().zip(args.into_iter()) {
                                             debug!("first elm symbol - procedure params - name: {:?} value: {:?}", name_ref, value_ref);
@@ -215,7 +217,7 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
 
                                         let proc_env = Env {
                                             local: procedure_local,
-                                            parent: p.env.borrow_mut().parent.clone()
+                                            parent: Some(Box::new(p.env.clone()))
                                         };
 
                                         debug!("proc_env: {:?}", proc_env);
@@ -250,28 +252,27 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                 Some(rest) => {
                                     match prepare_arguments(rest, env.clone()) {
                                         Ok(args) => {
-                                            let p_env_borrow_mut = p.env.borrow_mut();
+                                            let procedure_local = Box::new(RefCell::new(HashMap::new()));
                                             for (name_ref, value_ref) in p.params.iter().zip(args.into_iter()) {
                                                 debug!("first elm lambda - procedure params - name: {:?} value: {:?}", name_ref, value_ref);
                                                 if let (Some(&DataType::Symbol(ref name)), Some(ref value)) = (Some(name_ref), Some(value_ref)) {
-                                                    p_env_borrow_mut.local.borrow_mut().insert(name.to_string(), value.clone());
+                                                    procedure_local.borrow_mut().insert(name.to_string(), value.clone());
                                                 } else {
                                                     return Err(SchemeError::RuntimeError("internal error: unexpected state".into()))
                                                 }
                                             }
                                             Env {
-                                                local: p_env_borrow_mut.local.clone(),
-                                                parent: p_env_borrow_mut.parent.clone()
+                                                local: procedure_local,
+                                                parent: Some(Box::new(p.env.clone()))
                                             }
                                         }
                                         Err(e) => return Err(e)
                                     }
                                 }
                                 None => {
-                                    let p_env_borrow_mut = p.env.borrow_mut();
                                     Env {
-                                        local: p_env_borrow_mut.local.clone(),
-                                        parent: p_env_borrow_mut.parent.clone()
+                                        local: Box::new(RefCell::new(HashMap::new())),
+                                        parent: Some(Box::new(p.env.clone()))
                                     }
                                 }
                             };
@@ -364,7 +365,7 @@ fn ast2datatype(value: &AST) -> Result<DataType, SchemeError> {
                     Err("syntax error".into())
                 }
             } else if s.starts_with("\"") && s.ends_with("\"") {
-                Ok(DataType::Symbol((&s[1..s.len() - 1]).to_string()))
+                Ok(DataType::String((&s[1..s.len() - 1]).to_string()))
             } else {
                 Ok(DataType::Symbol(s.clone()))
             }

@@ -299,7 +299,7 @@ pub fn setup() -> HashMap<String, DataType> {
                 Some(&DataType::Lambda(ref p)) => {
                     debug!("first elm symbol - lambda: {:?}", p);
                     debug!("first elm symbol - procedure params: {:?}", p.params);
-                    let procedure_local = p.env.borrow_mut().local.clone();
+                    let procedure_local = Box::new(RefCell::new(HashMap::new()));
 
                     for (name_ref, value_ref) in p.params.iter().zip(args.into_iter()) {
                         debug!("first elm symbol - procedure params - name: {:?} value: {:?}", name_ref, value_ref);
@@ -312,7 +312,7 @@ pub fn setup() -> HashMap<String, DataType> {
 
                     let proc_env = Env {
                         local: procedure_local,
-                        parent: p.env.borrow_mut().parent.clone()
+                        parent: Some(Box::new(p.env.clone()))
                     };
 
                     debug!("proc_env: {:?}", proc_env);
@@ -464,7 +464,7 @@ pub fn setup() -> HashMap<String, DataType> {
                 },
                 &DataType::Lambda(ref p) => {
                     let list = l.iter().map(|item| {
-                        let procedure_local = p.env.borrow_mut().local.clone();
+                        let procedure_local = Box::new(RefCell::new(HashMap::new()));
                         let args = vec![item.clone()];
                         for (name_ref, value_ref) in p.params.iter().zip(args.into_iter()) {
                             if let (Some(&DataType::Symbol(ref name)), Some(ref value)) = (Some(name_ref), Some(value_ref)) {
@@ -476,7 +476,7 @@ pub fn setup() -> HashMap<String, DataType> {
 
                         let proc_env = Env {
                             local: procedure_local,
-                            parent: p.env.borrow_mut().parent.clone()
+                            parent: Some(Box::new(p.env.clone()))
                         };
 
                         debug!("proc_env: {:?}", proc_env);

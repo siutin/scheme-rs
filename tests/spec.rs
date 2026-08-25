@@ -16,7 +16,7 @@ fn quote_expression_test() {
     }
     {
         let test_result = run("(quote \"orange\")");
-        assert_eq!(Ok(Some(DataType::Symbol("orange".to_string()))), test_result.value);
+        assert_eq!(Ok(Some(DataType::String("orange".to_string()))), test_result.value);
     }
     {
         let test_result = run("(quote 42)");
@@ -150,6 +150,75 @@ fn division_by_zero_test() {
     // Normal division still works
     assert_eq!(Ok(Some(DataType::Number(5.0))), run("(/ 10 2)").value);
     assert_eq!(Ok(Some(DataType::Number(2.0))), run("(/ 12 3 2)").value);
+}
+
+#[test]
+fn lambda_fresh_env_test() {
+    // Each lambda call must get a fresh env frame, not mutate the captured one.
+    // If the closure env is mutated, the second call sees stale bindings.
+    // All in one run (single begin block):
+    let test_result = run(r#"
+    (define f (lambda (x) x))
+    (f 1)
+    (f 2)
+    "#);
+    // begin returns the last value
+    assert_eq!(Ok(Some(DataType::Number(2.0))), test_result.value);
+}
+
+#[test]
+fn lambda_no_arg_leak_test() {
+    // A lambda's param binding must not leak into the next call.
+    // This tests the children-path call site (eval.rs line ~247).
+    let test_result = run(r#"
+    (define add (lambda (a b) (+ a b)))
+    (add 3 4)
+    (add 10 20)
+    "#);
+    assert_eq!(Ok(Some(DataType::Number(30.0))), test_result.value);
+}
+
+#[test]
+fn lambda_via_apply_fresh_env_test() {
+    // apply with a lambda must also use a fresh env frame.
+    let test_result = run(r#"
+    (define f (lambda (x) (* x x)))
+    (apply f (list 3))
+    (apply f (list 5))
+    "#);
+    assert_eq!(Ok(Some(DataType::Number(25.0))), test_result.value);
+}
+
+#[test]
+fn lambda_via_map_fresh_env_test() {
+    // map with a lambda must use a fresh env frame per element.
+    let test_result = run(r#"
+    (define double (lambda (x) (* 2 x)))
+    (map double (list 1 2 3 4 5))
+    "#);
+    assert_eq!(
+        Ok(Some(DataType::List(vec![
+            DataType::Number(2.0),
+            DataType::Number(4.0),
+            DataType::Number(6.0),
+            DataType::Number(8.0),
+            DataType::Number(10.0),
+        ]))),
+        test_result.value
+    );
+}
+
+#[test]
+fn quote_string_type_test() {
+    // Quoted strings should be DataType::String, not DataType::Symbol.
+    let test_result = run("(quote \"hello world\")");
+    assert_eq!(
+        Ok(Some(DataType::String("hello world".to_string()))),
+        test_result.value
+    );
+    // string? should return #t for quoted strings
+    let test_result2 = run("(string? (quote \"test\"))");
+    assert_eq!(Ok(Some(DataType::Bool(true))), test_result2.value);
 }
 
 #[test]
