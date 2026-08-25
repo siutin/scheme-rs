@@ -173,11 +173,11 @@
   - Files: `src/eval.rs`, `tests/spec.rs`
   - Status: `[x]` done
 
-- [ ] **Task 20: `set!` — mutate existing binding**
+- [x] **Task 20: `set!` — mutate existing binding**
   - Acceptance: `(define x 1) (set! x 5) x` returns `5`. Setting a variable in the current scope mutates it in place.
-  - Verify: New test `set_test` passes, all existing tests pass
+  - Verify: New test `set_test` passes, all 41 tests pass
   - Files: `src/eval.rs`, `src/env.rs`, `tests/spec.rs`
-  - Status: `[ ]`
+  - Status: `[x]` done
 
 - [ ] **Task 21: `when` / `unless`**
   - Acceptance: `(when #t 1)` returns `1`, `(when #f 1)` returns unspecified, `(unless #t 1)` returns unspecified, `(unless #f 1)` returns `1`

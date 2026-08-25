@@ -251,6 +251,26 @@ fn cond_test() {
 }
 
 #[test]
+fn set_test() {
+    // set! mutates an existing binding
+    let test_result = run(r#"
+    (define x 1)
+    (set! x 5)
+    x
+    "#);
+    assert_eq!(Ok(Some(DataType::Number(5.0))), test_result.value);
+    // set! on undefined variable returns error
+    let test_result2 = run("(set! undefined_var 5)");
+    assert_eq!(Err(SchemeError::UndefinedSymbol("undefined_var".to_string())), test_result2.value);
+    // set! works with let bindings (multi-expr body needs begin)
+    let test_result3 = run(r#"
+    (let ((y 10))
+      (begin (set! y 20) y))
+    "#);
+    assert_eq!(Ok(Some(DataType::Number(20.0))), test_result3.value);
+}
+
+#[test]
 fn tricky_test1 () {
 
     // Testing the case that the 1st element is a children and it returns a function/lambda after an evaluation

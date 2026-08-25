@@ -27,4 +27,20 @@ impl Env {
             }
         }
     }
+
+    /// Set an existing binding, searching up the parent chain.
+    /// Returns true if found and set, false if not found.
+    pub fn set(&self, key: &String, value: DataType) -> bool {
+        if self.local.borrow().contains_key::<str>(key) {
+            self.local.borrow_mut().insert(key.clone(), value);
+            return true;
+        }
+        match self.parent {
+            Some(ref some_parent) => {
+                let parent_borrow = some_parent.borrow();
+                parent_borrow.set(key, value)
+            }
+            None => false
+        }
+    }
 }

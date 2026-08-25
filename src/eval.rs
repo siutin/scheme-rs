@@ -204,13 +204,9 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                                 local: Box::new(RefCell::new(local)),
                                 parent: Some(Box::new(env.clone())),
                             };
-                            // Body can be a single expression or multiple; wrap in Children if needed
-                            let body = match body_ast {
-                                AST::Children(ref v) if v.len() == 1 => v[0].clone(),
-                                AST::Children(_) => body_ast.clone(),
-                                _ => body_ast.clone(),
-                            };
-                            eval(Some(body), Rc::new(RefCell::new(let_env)))
+                            // Body is a single expression (which may be a function call).
+                            // For multiple expressions, users wrap in (begin ...).
+                            eval(Some(body_ast.clone()), Rc::new(RefCell::new(let_env)))
                         } else {
                             Err("let requires bindings and a body".into())
                         }
@@ -249,6 +245,30 @@ pub fn eval(ast_option: Option<AST>, env: Rc<RefCell<Env>>) -> Result<Option<Dat
                             }
                         }
                         result
+                    }
+                    "set!" => {
+                        // (set! var expr) — mutate existing binding
+                        if let (Some(&AST::Symbol(ref name)), Some(val_ast)) = (s1, s2) {
+                            match eval(Some(val_ast.clone()), env.clone()) {
+                                Ok(Some(val)) => {
+                                    if env.borrow().set(name, val) {
+                                        Ok(None)
+                                    } else {
+                                        Err(SchemeError::UndefinedSymbol(name.clone()))
+                                    }
+                                }
+                                Ok(None) => {
+                                    if env.borrow().set(name, DataType::Bool(false)) {
+                                        Ok(None)
+                                    } else {
+                                        Err(SchemeError::UndefinedSymbol(name.clone()))
+                                    }
+                                }
+                                Err(e) => Err(e),
+                            }
+                        } else {
+                            Err("set! requires a symbol and a value".into())
+                        }
                     }
                     _ => {
                         debug!("Some(AST::Symbol) but not define");
