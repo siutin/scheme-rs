@@ -1018,7 +1018,13 @@ mod std_function {
         #[test]
         fn pair_q() {
             {
+                // R5RS: a non-empty list is a pair
                 let test_result = run("(pair? (list 7 9 4 0 3))");
+                assert_eq!(Ok(Some(DataType::Bool(true))), test_result.value);
+            }
+            {
+                // empty list is not a pair
+                let test_result = run("(pair? (list))");
                 assert_eq!(Ok(Some(DataType::Bool(false))), test_result.value);
             }
             {

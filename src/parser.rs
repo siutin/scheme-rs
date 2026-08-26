@@ -46,13 +46,20 @@ fn tokenize(program: &str) -> Vec<String>
     while i < chars.len() {
         let c = chars[i];
         if in_string {
-            current.push(c);
-            if c == '"' {
-                tokens.push(current.clone());
-                current.clear();
-                in_string = false;
+            if c == '\\' && i + 1 < chars.len() {
+                // Escape sequence: keep the backslash and the next char
+                current.push(c);
+                current.push(chars[i + 1]);
+                i += 2;
+            } else {
+                current.push(c);
+                if c == '"' {
+                    tokens.push(current.clone());
+                    current.clear();
+                    in_string = false;
+                }
+                i += 1;
             }
-            i += 1;
         } else if c == '"' {
             if !current.is_empty() {
                 tokens.push(current.clone());
