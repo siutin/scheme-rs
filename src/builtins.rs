@@ -1,11 +1,10 @@
 use std::collections::HashMap;
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use log::debug;
 
 use crate::types::{Function, DataType, FloatIterExt};
-use crate::env::{Env, EnvRef, Environment};
+use crate::env::{Env, EnvRef};
 use crate::eval::{eval, datatype2str};
 use crate::SchemeError;
 
@@ -286,19 +285,19 @@ pub fn setup() -> HashMap<String, DataType> {
                 Some(&DataType::Lambda(ref p)) => {
                     debug!("first elm symbol - lambda: {:?}", p);
                     debug!("first elm symbol - procedure params: {:?}", p.params);
-                    let proc_env = Env::new(HashMap::new(), Some(p.env.clone()));
+                    let proc_env = Env::child(p.env.clone());
 
                     for (name_ref, value_ref) in p.params.iter().zip(args.into_iter()) {
                         debug!("first elm symbol - procedure params - name: {:?} value: {:?}", name_ref, value_ref);
                         if let (Some(&DataType::Symbol(ref name)), Some(value)) = (Some(name_ref), Some(value_ref)) {
-                            proc_env.define(name.to_string(), value.clone());
+                            proc_env.borrow().define(name.to_string(), value.clone());
                         } else {
                             return Err(SchemeError::RuntimeError("internal error: unexpected state".into()))
                         }
                     }
 
                     debug!("proc_env: {:?}", proc_env);
-                    return eval(Some((*p.body).clone()), Rc::new(RefCell::new(proc_env)) as EnvRef);
+                    return eval(Some((*p.body).clone()), proc_env);
                 }
                 Some(_) | None => Err("apply function unknown first argument type".into())
             }
@@ -454,18 +453,18 @@ pub fn setup() -> HashMap<String, DataType> {
                 },
                 &DataType::Lambda(ref p) => {
                     let list = l.iter().map(|item| {
-                        let proc_env = Env::new(HashMap::new(), Some(p.env.clone()));
+                        let proc_env = Env::child(p.env.clone());
                         let args = vec![item.clone()];
                         for (name_ref, value_ref) in p.params.iter().zip(args.into_iter()) {
                             if let (Some(&DataType::Symbol(ref name)), Some(ref value)) = (Some(name_ref), Some(value_ref)) {
-                                proc_env.define(name.to_string(), value.clone());
+                                proc_env.borrow().define(name.to_string(), value.clone());
                             } else {
                                 return Err(SchemeError::RuntimeError("internal error: unexpected state".into()))
                             }
                         }
 
                         debug!("proc_env: {:?}", proc_env);
-                        eval(Some((*p.body).clone()), Rc::new(RefCell::new(proc_env)) as EnvRef)
+                        eval(Some((*p.body).clone()), proc_env)
                     }).flat_map(|x| x.ok())
                         .filter(|x| x.is_some())
                         .flat_map(|x| x)
