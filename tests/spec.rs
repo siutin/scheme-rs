@@ -1161,6 +1161,192 @@ mod std_function {
     }
 }
 
+mod r5rs_remaining_core {
+    use super::*;
+
+    #[test]
+    fn for_each_test() {
+        // for-each returns unspecified (None), executes for side effects
+        let result = run("(for-each (lambda (x) x) '(1 2 3))");
+        assert_eq!(Ok(None), result.value);
+    }
+
+    #[test]
+    fn for_each_with_builtin_test() {
+        let result = run("(for-each display '(1 2 3))");
+        assert_eq!(Ok(None), result.value);
+    }
+
+    #[test]
+    fn cadr_test() {
+        assert_eq!(Ok(Some(DataType::Integer(2))), run("(cadr '(1 2 3))").value);
+    }
+
+    #[test]
+    fn caddr_test() {
+        assert_eq!(Ok(Some(DataType::Integer(3))), run("(caddr '(1 2 3))").value);
+    }
+
+    #[test]
+    fn cddr_test() {
+        assert_eq!(Ok(Some(DataType::List(vec![
+            DataType::Integer(3),
+        ]))), run("(cddr '(1 2 3))").value);
+    }
+
+    #[test]
+    fn caar_test() {
+        assert_eq!(Ok(Some(DataType::Integer(1))), run("(caar '((1 2) 3))").value);
+    }
+
+    #[test]
+    fn cadddr_test() {
+        assert_eq!(Ok(Some(DataType::Integer(4))), run("(cadddr '(1 2 3 4))").value);
+    }
+
+    #[test]
+    fn integer_predicate_test() {
+        assert_eq!(Ok(Some(DataType::Bool(true))), run("(integer? 42)").value);
+        assert_eq!(Ok(Some(DataType::Bool(false))), run("(integer? 3.14)").value);
+        assert_eq!(Ok(Some(DataType::Bool(false))), run("(integer? \"hello\")").value);
+    }
+
+    #[test]
+    fn real_predicate_test() {
+        assert_eq!(Ok(Some(DataType::Bool(true))), run("(real? 42)").value);
+        assert_eq!(Ok(Some(DataType::Bool(true))), run("(real? 3.14)").value);
+        assert_eq!(Ok(Some(DataType::Bool(false))), run("(real? \"hello\")").value);
+    }
+
+    #[test]
+    fn string_to_number_test() {
+        assert_eq!(Ok(Some(DataType::Integer(42))), run("(string->number \"42\")").value);
+        assert_eq!(Ok(Some(DataType::Float(3.14))), run("(string->number \"3.14\")").value);
+        // string->number returns #f for non-numeric strings
+        assert_eq!(Ok(Some(DataType::Bool(false))), run("(string->number \"hello\")").value);
+    }
+
+    #[test]
+    fn number_to_string_test() {
+        assert_eq!(Ok(Some(DataType::String("42".into()))), run("(number->string 42)").value);
+        assert_eq!(Ok(Some(DataType::String("3.14".into()))), run("(number->string 3.14)").value);
+    }
+
+    #[test]
+    fn number_to_string_radix_test() {
+        assert_eq!(Ok(Some(DataType::String("1010".into()))), run("(number->string 10 2)").value);
+        assert_eq!(Ok(Some(DataType::String("a".into()))), run("(number->string 10 16)").value);
+    }
+
+    #[test]
+    fn string_copy_test() {
+        assert_eq!(Ok(Some(DataType::String("hello".into()))), run("(string-copy \"hello\")").value);
+        assert_eq!(Ok(Some(DataType::String("ell".into()))), run("(string-copy \"hello\" 1 4)").value);
+    }
+
+    #[test]
+    fn assert_test() {
+        assert_eq!(Ok(None), run("(assert #t)").value);
+        assert_eq!(Err(SchemeError::RuntimeError("assertion failed".into())), run("(assert #f)").value);
+        assert_eq!(Ok(None), run("(assert 1)").value); // non-#f is true
+    }
+
+    #[test]
+    fn exp_test() {
+        let result = run("(exp 1)");
+        if let Ok(Some(DataType::Float(f))) = result.value {
+            assert!((f - std::f64::consts::E).abs() < 1e-10);
+        } else {
+            panic!("expected float");
+        }
+    }
+
+    #[test]
+    fn log_test() {
+        let result = run("(log 2.718281828459045)");
+        if let Ok(Some(DataType::Float(f))) = result.value {
+            assert!((f - 1.0).abs() < 1e-10);
+        } else {
+            panic!("expected float");
+        }
+    }
+
+    #[test]
+    fn sin_cos_test() {
+        let result = run("(sin 0)");
+        if let Ok(Some(DataType::Float(f))) = result.value {
+            assert!(f.abs() < 1e-10);
+        } else {
+            panic!("expected float");
+        }
+        let result = run("(cos 0)");
+        if let Ok(Some(DataType::Float(f))) = result.value {
+            assert!((f - 1.0).abs() < 1e-10);
+        } else {
+            panic!("expected float");
+        }
+    }
+
+    #[test]
+    fn tan_test() {
+        let result = run("(tan 0)");
+        if let Ok(Some(DataType::Float(f))) = result.value {
+            assert!(f.abs() < 1e-10);
+        } else {
+            panic!("expected float");
+        }
+    }
+
+    #[test]
+    fn atan_test() {
+        let result = run("(atan 1)");
+        if let Ok(Some(DataType::Float(f))) = result.value {
+            assert!((f - std::f64::consts::FRAC_PI_4).abs() < 1e-10);
+        } else {
+            panic!("expected float");
+        }
+        // Two-argument atan: (atan y x) = atan2(y, x)
+        let result = run("(atan 1 1)");
+        if let Ok(Some(DataType::Float(f))) = result.value {
+            assert!((f - std::f64::consts::FRAC_PI_4).abs() < 1e-10);
+        } else {
+            panic!("expected float");
+        }
+    }
+
+    #[test]
+    fn asin_acos_test() {
+        let result = run("(asin 1)");
+        if let Ok(Some(DataType::Float(f))) = result.value {
+            assert!((f - std::f64::consts::FRAC_PI_2).abs() < 1e-10);
+        } else {
+            panic!("expected float");
+        }
+        let result = run("(acos 1)");
+        if let Ok(Some(DataType::Float(f))) = result.value {
+            assert!(f.abs() < 1e-10);
+        } else {
+            panic!("expected float");
+        }
+    }
+
+    #[test]
+    fn filter_test() {
+        assert_eq!(Ok(Some(DataType::List(vec![
+            DataType::Integer(2),
+            DataType::Integer(4),
+        ]))), run("(filter even? '(1 2 3 4 5))").value);
+    }
+
+    #[test]
+    fn filter_with_lambda_test() {
+        assert_eq!(Ok(Some(DataType::List(vec![
+            DataType::Integer(3),
+            DataType::Integer(4),
+        ]))), run("(filter (lambda (x) (> x 2)) '(1 2 3 4))").value);
+    }
+}
+
 #[cfg(test)]
 #[ctor::ctor]
 fn init() {
