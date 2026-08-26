@@ -567,6 +567,7 @@ pub fn setup() -> HashMap<String, DataType> {
         }
         match value_option.unwrap() {
             &DataType::Pair(_) => Ok(Some(DataType::Bool(true))),
+            &DataType::List(ref v) => Ok(Some(DataType::Bool(!v.is_empty()))),
             _ => Ok(Some(DataType::Bool(false)))
         }
     }))));

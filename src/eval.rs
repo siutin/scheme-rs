@@ -7,6 +7,28 @@ use crate::types::{AST, Procedure, Function, DataType};
 use crate::env::{Env, EnvRef};
 use crate::SchemeError;
 
+/// Unescape a string literal content (between quotes).
+/// Handles: \" → ", \\ → \, \n → newline, \t → tab
+fn unescape_string(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('"') => result.push('"'),
+                Some('\\') => result.push('\\'),
+                Some('n') => result.push('\n'),
+                Some('t') => result.push('\t'),
+                Some(other) => { result.push('\\'); result.push(other); }
+                None => result.push('\\'),
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 pub fn eval(mut ast_option: Option<AST>, mut env: EnvRef) -> Result<Option<DataType>, SchemeError> {
     loop {
     debug!("eval");
@@ -30,7 +52,7 @@ pub fn eval(mut ast_option: Option<AST>, mut env: EnvRef) -> Result<Option<DataT
                 let slice = &s[1..s.len()];
                 return Ok(Some(DataType::Symbol(slice.to_string())));
             } else if s.starts_with("\"") && s.ends_with("\"") {
-                return Ok(Some(DataType::String((&s[1..s.len() - 1]).to_string())));
+                return Ok(Some(DataType::String(unescape_string(&s[1..s.len() - 1]))));
             } else {
                 match env.borrow().get(&s) {
                     Some(data) => return Ok(Some(data)),
@@ -136,7 +158,7 @@ pub fn eval(mut ast_option: Option<AST>, mut env: EnvRef) -> Result<Option<DataT
                                             return Err("syntax error".into());
                                         }
                                     } else if s.starts_with("\"") && s.ends_with("\"") {
-                                        env.borrow().define(s1.clone(), DataType::String((&s[1..s.len() - 1]).to_string()));
+                                        env.borrow().define(s1.clone(), DataType::String(unescape_string(&s[1..s.len() - 1])));
                                     } else {
                                         let data_option = env.borrow().get(s);
                                         if let Some(data) = data_option {
@@ -897,7 +919,7 @@ fn ast2datatype(value: &AST) -> Result<DataType, SchemeError> {
                     Err("syntax error".into())
                 }
             } else if s.starts_with("\"") && s.ends_with("\"") {
-                Ok(DataType::String((&s[1..s.len() - 1]).to_string()))
+                Ok(DataType::String(unescape_string(&s[1..s.len() - 1])))
             } else {
                 Ok(DataType::Symbol(s.clone()))
             }
