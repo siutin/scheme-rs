@@ -31,27 +31,24 @@ This phase finishes the migration:
 
 ### Phase 13: Performance — InternedEnv
 
-**Dependency**: Environment trait (done), SPEC_PERF bottleneck #3
+**Status**: EXPERIMENTED, REVERTED — runtime interning is 5-9% slower.
+See `projects/SPEC_INTERNED_ENV.md` for full analysis.
 
-The biggest remaining perf bottleneck is string-based symbol lookup. Every
-`env.borrow().get(&s)` hashes a string. An `InternedEnv` would:
+Runtime symbol interning (string → u32 at lookup time) adds an extra
+indirection that's more expensive than the direct string → value lookup.
+The intern table lookup itself requires string hashing, negating the
+savings from u32 HashMap keys.
 
-1. Intern all symbols into a `Vec<String>` + `HashMap<String, u32>` table
-2. Use `u32` IDs as HashMap keys in the environment
-3. Store the interning table in the root env, share via `Rc`
+**What would work instead**:
+- **Parse-time interning** — intern at parse time so AST carries u32 IDs.
+  Eliminates ALL string hashing from the hot path. Large refactor (8-12 tasks).
+- **Faster hasher** — replace SipHash with `ahash` or `fxhash`. Small change,
+  adds dependency. Expected 20-40% speedup on HashMap operations.
+- **Vec for small scopes** — `Vec<(String, DataType)>` for child envs (<10
+  bindings). Linear scan faster than HashMap for small N. No dependency.
 
-```rust
-pub struct InternedEnv {
-    symbols: Rc<RefCell<SymbolTable>>,  // shared intern table
-    local: Box<RefCell<HashMap<u32, DataType>>>,
-    parent: Option<EnvRef>,
-}
-```
-
-**Expected gain**: 1.5-3x on symbol-heavy benchmarks (fib, ackermann) by
-eliminating string hashing in the hot path.
-
-**Effort**: Medium (3-4 tasks: symbol table, InternedEnv impl, wire into setup, benchmark)
+**Effort**: Medium (runtime interning — tried, failed). Parse-time interning
+would be Large (8-12 tasks). Faster hasher or Vec scopes would be Small.
 
 ### Phase 14: R5RS Remaining Core
 
@@ -149,12 +146,12 @@ make it optional.
 
 | Phase | Impact | Effort | Priority |
 |-------|--------|--------|----------|
-| 12: Env trait follow-up | Low (cleanup) | Small | Do first — finishes the trait migration |
-| 13: InternedEnv | High (perf) | Medium | Do second — biggest perf win available |
-| 14: R5RS remaining core | Medium (coverage) | Small-Medium | Do third — quick wins, no architecture |
-| 15: Vectors | Medium (coverage) | Medium | Do fourth — commonly expected |
-| 16: Character type | Low-Medium | Medium | Do fifth — enables better strings |
-| 17: Dotted pairs | Medium (correctness) | Large | Do sixth — semantically important but risky |
+| 12: Env trait follow-up | Low (cleanup) | Small | ✅ Done |
+| 13: InternedEnv | ~~High (perf)~~ | ~~Medium~~ | ❌ Tried, reverted — runtime interning is slower. Parse-time interning or faster hasher would work but are separate efforts. |
+| 14: R5RS remaining core | Medium (coverage) | Small-Medium | Do next — quick wins, no architecture |
+| 15: Vectors | Medium (coverage) | Medium | Do after Phase 14 — commonly expected |
+| 16: Character type | Low-Medium | Medium | Do after Phase 15 — enables better strings |
+| 17: Dotted pairs | Medium (correctness) | Large | Do after Phase 16 — semantically important but risky |
 | 18: Macros | High (coverage) | Very large | Defer unless specifically needed |
 | 19: call/cc | Low (rarely used) | Very large | Defer indefinitely |
 
