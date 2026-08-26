@@ -2,21 +2,12 @@
 (begin
   (print "list operations example")
 
-  ;; map: apply f to each element
+  ;; map: apply f to each element (user-defined, single-list)
   (define map
     (lambda (f lst)
       (if (null? lst)
         (quote ())
         (cons (f (car lst)) (map f (cdr lst))))))
-
-  ;; filter: keep elements where pred is true
-  (define filter
-    (lambda (pred lst)
-      (if (null? lst)
-        (quote ())
-        (if (pred (car lst))
-          (cons (car lst) (filter pred (cdr lst)))
-          (filter pred (cdr lst))))))
 
   ;; reduce: fold left
   (define reduce
