@@ -35,6 +35,23 @@ macro_rules! define_comparison {
     };
 }
 
+/// Helper: car of a DataType (pair/list), returns None if not applicable.
+fn car(d: &DataType) -> Option<DataType> {
+    if let DataType::List(ref v) = d {
+        if !v.is_empty() { return Some(v[0].clone()); }
+    }
+    None
+}
+
+/// Helper: cdr of a DataType (pair/list), returns None if not applicable.
+fn cdr(d: &DataType) -> Option<DataType> {
+    if let DataType::List(ref v) = d {
+        if v.len() > 1 { return Some(DataType::List(v[1..].to_vec())); }
+        if v.len() == 1 { return Some(DataType::List(Vec::new())); }
+    }
+    None
+}
+
 pub fn setup() -> HashMap<String, DataType> {
     let mut map = HashMap::new();
     map.insert("pi".to_string(), DataType::Float(std::f64::consts::PI));
@@ -1141,6 +1158,223 @@ pub fn setup() -> HashMap<String, DataType> {
             msg.push_str(&datatype2str(arg));
         }
         Err(SchemeError::RuntimeError(msg))
+    }))));
+
+    // --- for-each ---
+
+    map.insert("for-each".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, env: EnvRef| {
+        if vec.len() != 2 {
+            return Err("for-each requires a procedure and a list".into());
+        }
+        if let (Some(d), Some(&DataType::List(ref l))) = (vec.first(), vec.get(1)) {
+            match d {
+                &DataType::Proc(ref f) => {
+                    for item in l.iter() {
+                        let _ = f.call(vec![item.clone()], env.clone())?;
+                    }
+                    Ok(None)
+                },
+                &DataType::Lambda(ref p) => {
+                    for item in l.iter() {
+                        let proc_env = Env::child(p.env.clone());
+                        let args = vec![item.clone()];
+                        for (name_ref, value_ref) in p.params.iter().zip(args.into_iter()) {
+                            if let (Some(&DataType::Symbol(ref name)), Some(ref value)) = (Some(name_ref), Some(value_ref)) {
+                                proc_env.borrow().define(name.to_string(), value.clone());
+                            } else {
+                                return Err(SchemeError::RuntimeError("internal error: unexpected state".into()))
+                            }
+                        }
+                        eval(Some((*p.body).clone()), proc_env)?;
+                    }
+                    Ok(None)
+                },
+                _ => Err("for-each: first argument must be a procedure".into())
+            }
+        } else {
+            Err("for-each: second argument must be a list".into())
+        }
+    }))));
+
+    // --- car/cdr compositions ---
+
+    macro_rules! car_cdr_comp {
+        ($name:expr, $body:expr) => {
+            map.insert($name.to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
+                if vec.len() != 1 { return Err(SchemeError::RuntimeError(format!("{} requires exactly one argument", $name))); }
+                $body(&vec[0]).map(Some).ok_or_else(|| SchemeError::RuntimeError(format!("{}: not a pair or empty list", $name)))
+            }))));
+        }
+    }
+
+    car_cdr_comp!("caar", |x: &DataType| car(x).and_then(|d| car(&d)));
+    car_cdr_comp!("cadr", |x: &DataType| cdr(x).and_then(|d| car(&d)));
+    car_cdr_comp!("cdar", |x: &DataType| car(x).and_then(|d| cdr(&d)));
+    car_cdr_comp!("cddr", |x: &DataType| cdr(x).and_then(|d| cdr(&d)));
+    car_cdr_comp!("caaar", |x: &DataType| car(x).and_then(|d| car(&d)).and_then(|d| car(&d)));
+    car_cdr_comp!("caadr", |x: &DataType| cdr(x).and_then(|d| car(&d)).and_then(|d| car(&d)));
+    car_cdr_comp!("cadar", |x: &DataType| car(x).and_then(|d| cdr(&d)).and_then(|d| car(&d)));
+    car_cdr_comp!("caddr", |x: &DataType| cdr(x).and_then(|d| cdr(&d)).and_then(|d| car(&d)));
+    car_cdr_comp!("cdaar", |x: &DataType| car(x).and_then(|d| car(&d)).and_then(|d| cdr(&d)));
+    car_cdr_comp!("cdadr", |x: &DataType| cdr(x).and_then(|d| car(&d)).and_then(|d| cdr(&d)));
+    car_cdr_comp!("cddar", |x: &DataType| car(x).and_then(|d| cdr(&d)).and_then(|d| cdr(&d)));
+    car_cdr_comp!("cdddr", |x: &DataType| cdr(x).and_then(|d| cdr(&d)).and_then(|d| cdr(&d)));
+    car_cdr_comp!("cadddr", |x: &DataType| cdr(x).and_then(|d| cdr(&d)).and_then(|d| cdr(&d)).and_then(|d| car(&d)));
+
+    // --- Numeric type predicates ---
+
+    map.insert("integer?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
+        if vec.len() != 1 { return Err("integer? requires one argument".into()); }
+        Ok(Some(DataType::Bool(matches!(vec[0], DataType::Integer(_)))))
+    }))));
+
+    map.insert("real?".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
+        if vec.len() != 1 { return Err("real? requires one argument".into()); }
+        Ok(Some(DataType::Bool(vec[0].is_number())))
+    }))));
+
+    // --- string->number / number->string ---
+
+    map.insert("string->number".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
+        if vec.len() != 1 { return Err("string->number requires one argument".into()); }
+        if let DataType::String(ref s) = vec[0] {
+            if let Ok(i) = s.parse::<i64>() {
+                return Ok(Some(DataType::Integer(i)));
+            }
+            if let Ok(f) = s.parse::<f64>() {
+                return Ok(Some(DataType::Float(f)));
+            }
+            // R5RS: returns #f if not a number
+            Ok(Some(DataType::Bool(false)))
+        } else {
+            Err("string->number requires a string argument".into())
+        }
+    }))));
+
+    map.insert("number->string".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
+        if vec.len() < 1 || vec.len() > 2 { return Err("number->string requires one or two arguments".into()); }
+        if !vec[0].is_number() { return Err("number->string: first argument must be a number".into()); }
+        let radix = if vec.len() == 2 {
+            if let DataType::Integer(r) = vec[1] { r } else { return Err("number->string: radix must be an integer".into()); }
+        } else { 10 };
+        let s = match vec[0] {
+            DataType::Integer(i) => match radix {
+                2 => format!("{:b}", i),
+                8 => format!("{:o}", i),
+                16 => format!("{:x}", i),
+                10 | _ => i.to_string(),
+            },
+            DataType::Float(f) => {
+                if radix != 10 { format!("{:x}", f as i64) } else { f.to_string() }
+            },
+            _ => return Err("number->string: not a number".into()),
+        };
+        Ok(Some(DataType::String(s)))
+    }))));
+
+    // --- string-copy ---
+
+    map.insert("string-copy".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
+        if vec.len() < 1 || vec.len() > 3 { return Err("string-copy requires 1-3 arguments".into()); }
+        if let DataType::String(ref s) = vec[0] {
+            let start = if vec.len() >= 2 {
+                if let DataType::Integer(i) = vec[1] { i as usize } else { return Err("string-copy: start must be integer".into()); }
+            } else { 0 };
+            let end = if vec.len() >= 3 {
+                if let DataType::Integer(i) = vec[2] { i as usize } else { return Err("string-copy: end must be integer".into()); }
+            } else { s.len() };
+            if start > end || end > s.len() {
+                return Err("string-copy: indices out of range".into());
+            }
+            Ok(Some(DataType::String(s[start..end].to_string())))
+        } else {
+            Err("string-copy: first argument must be a string".into())
+        }
+    }))));
+
+    // --- assert ---
+
+    map.insert("assert".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
+        if vec.len() != 1 { return Err("assert requires one argument".into()); }
+        match &vec[0] {
+            DataType::Bool(true) => Ok(None),
+            DataType::Bool(false) => Err(SchemeError::RuntimeError("assertion failed".to_string())),
+            _ => {
+                // R5RS: anything not #f is true
+                Ok(None)
+            }
+        }
+    }))));
+
+    // --- Transcendental math functions ---
+
+    macro_rules! transcendental {
+        ($name:expr, $f:expr) => {
+            map.insert($name.to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
+                if vec.len() != 1 { return Err(SchemeError::RuntimeError(format!("{} requires one argument", $name))); }
+                if !vec[0].is_number() { return Err(SchemeError::RuntimeError(format!("{} requires a number", $name))); }
+                let x = vec[0].as_f64().unwrap();
+                Ok(Some(DataType::Float($f(x))))
+            }))));
+        }
+    }
+
+    transcendental!("exp", f64::exp);
+    transcendental!("log", f64::ln);
+    transcendental!("sin", f64::sin);
+    transcendental!("cos", f64::cos);
+    transcendental!("tan", f64::tan);
+    transcendental!("asin", f64::asin);
+    transcendental!("acos", f64::acos);
+
+    map.insert("atan".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, _: EnvRef| {
+        if vec.len() < 1 || vec.len() > 2 { return Err("atan requires 1-2 arguments".into()); }
+        if !vec.iter().all(|x| x.is_number()) { return Err("atan requires numbers".into()); }
+        let y = vec[0].as_f64().unwrap();
+        if vec.len() == 1 {
+            Ok(Some(DataType::Float(y.atan())))
+        } else {
+            let x = vec[1].as_f64().unwrap();
+            Ok(Some(DataType::Float(y.atan2(x))))
+        }
+    }))));
+
+    // --- filter (not R5RS but commonly expected) ---
+
+    map.insert("filter".to_string(), DataType::Proc(Function(Rc::new(|vec: Vec<DataType>, env: EnvRef| {
+        if vec.len() != 2 { return Err("filter requires a predicate and a list".into()); }
+        if let (Some(d), Some(&DataType::List(ref l))) = (vec.first(), vec.get(1)) {
+            let mut result = Vec::new();
+            match d {
+                &DataType::Proc(ref f) => {
+                    for item in l.iter() {
+                        if let Ok(Some(DataType::Bool(true))) = f.call(vec![item.clone()], env.clone()) {
+                            result.push(item.clone());
+                        }
+                    }
+                },
+                &DataType::Lambda(ref p) => {
+                    for item in l.iter() {
+                        let proc_env = Env::child(p.env.clone());
+                        let args = vec![item.clone()];
+                        for (name_ref, value_ref) in p.params.iter().zip(args.into_iter()) {
+                            if let (Some(&DataType::Symbol(ref name)), Some(ref value)) = (Some(name_ref), Some(value_ref)) {
+                                proc_env.borrow().define(name.to_string(), value.clone());
+                            } else {
+                                return Err(SchemeError::RuntimeError("internal error: unexpected state".into()))
+                            }
+                        }
+                        if let Ok(Some(DataType::Bool(true))) = eval(Some((*p.body).clone()), proc_env) {
+                            result.push(item.clone());
+                        }
+                    }
+                },
+                _ => return Err("filter: first argument must be a procedure".into())
+            }
+            Ok(Some(DataType::List(result)))
+        } else {
+            Err("filter: second argument must be a list".into())
+        }
     }))));
 
     return map;
