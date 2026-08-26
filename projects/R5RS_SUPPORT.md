@@ -58,17 +58,18 @@ Legend:
 | `zero?` `positive?` `negative?` | ✅ | |
 | `even?` `odd?` | ✅ | |
 | `number?` | ✅ | True for Integer and Float |
-| `integer?` | ❌ | |
-| `real?` `rational?` `complex?` | ❌ | |
+| `integer?` | ✅ | True for Integer only |
+| `real?` | ✅ | True for Integer and Float |
+| `rational?` `complex?` | ❌ | |
 | `exact?` `inexact?` | ❌ | No exact/inexact distinction |
 | `exact->inexact` `inexact->exact` | ❌ | |
 | `gcd` `lcm` | ✅ | |
 | `floor` `ceiling` `truncate` `round` | ✅ | Return Integer |
 | `sqrt` | ✅ | Always returns Float |
 | `expt` | ✅ | Integer if both args integer and result is whole |
-| `exp` `log` `sin` `cos` `tan` | ❌ | |
-| `atan` `asin` `acos` | ❌ | |
-| `string->number` `number->string` | ❌ | |
+| `exp` `log` `sin` `cos` `tan` | ✅ | Transcendental functions, return Float |
+| `atan` `asin` `acos` | ✅ | `atan` supports 2-arg form (atan2) |
+| `string->number` `number->string` | ✅ | With optional radix (2/8/10/16) |
 | BigInt / arbitrary precision | ❌ | i64 only |
 
 ---
@@ -90,7 +91,7 @@ Legend:
 | `member` `memq` `memv` | ✅ | |
 | `assoc` `assq` `assv` | ✅ | |
 | `set-car!` `set-cdr!` | ❌ | Pairs are not mutable |
-| `cadr` `caddr` `cddr` etc. | ❌ | Only `car`/`cdr` |
+| `cadr` `caddr` `cddr` etc. | ✅ | All 2/3/4-level car/cdr compositions |
 | Improper lists (dotted pairs) | ❌ | `(cons 1 2)` creates a 2-element list, not a pair |
 
 ---
@@ -110,7 +111,7 @@ Legend:
 | `substring` | ✅ | |
 | `string-ref` | ✅ | Returns 1-char string (no char type) |
 | `string-set!` | ❌ | Strings are not mutable |
-| `string-copy` | ❌ | |
+| `string-copy` | ✅ | With optional start/end indices |
 | `make-string` | ✅ | |
 | `char?` `char->integer` `integer->char` | ❌ | No character type |
 
@@ -148,7 +149,7 @@ Legend:
 | `quasiquote` / `unquote` / `unquote-splicing` | ✅ | With shorthand syntax |
 | `apply` | ✅ | |
 | `map` | ✅ | Single-list only |
-| `for-each` | ❌ | |
+| `for-each` | ✅ | Single-list, for side effects |
 | `call/cc` `call-with-current-continuation` | ❌ | No continuation support |
 | `dynamic-wind` | ❌ | |
 | `force` `delay` | ❌ | No promises/delays |
@@ -212,8 +213,8 @@ Legend:
 |---------|--------|-------|
 | `map` | ⚠️ | Single-list only — `(map f lst1 lst2)` not supported |
 | `apply` | ✅ | |
-| `for-each` | ❌ | |
-| `filter` | ❌ | Not in R5RS but commonly expected |
+| `for-each` | ✅ | Single-list, for side effects |
+| `filter` | ✅ | Not in R5RS but commonly expected |
 | `reduce` `fold` | ❌ | Not in R5RS but commonly expected |
 
 ---
@@ -223,7 +224,7 @@ Legend:
 | Feature | Status | Notes |
 |---------|--------|-------|
 | `error` | ✅ | Raises RuntimeError with message + irritants |
-| `assert` | ❌ | |
+| `assert` | ✅ | Raises error if argument is #f |
 | `raise` `with-exception-handler` | ❌ | No condition system (R6RS+) |
 
 ---
@@ -234,23 +235,24 @@ Legend:
 |----------|-----------|---------|---------------|
 | Lexical | 9 | 1 | 5 |
 | Basic Concepts | 8 | 0 | 0 |
-| Numbers | 20 | 0 | 14 |
-| Lists & Pairs | 14 | 0 | 5 |
-| Symbols & Strings | 12 | 0 | 3 |
+| Numbers | 30 | 0 | 6 |
+| Lists & Pairs | 15 | 0 | 4 |
+| Symbols & Strings | 13 | 0 | 2 |
 | Booleans & Predicates | 4 | 0 | 0 |
-| Control Flow | 16 | 1 | 6 |
+| Control Flow | 17 | 1 | 5 |
 | I/O | 3 | 0 | 7 |
 | Vectors | 0 | 0 | 6 |
 | Evaluation | 0 | 0 | 5 |
 | Macros | 0 | 0 | 5 |
-| Higher-Order | 1 | 1 | 2 |
-| Error Handling | 1 | 0 | 2 |
-| **Total** | **88** | **3** | **61** |
+| Higher-Order | 3 | 1 | 1 |
+| Error Handling | 2 | 0 | 1 |
+| **Total** | **104** | **3** | **47** |
 
-**Overall**: ~58% of R5RS features supported. The interpreter covers the core
-subset needed for most programs: lexical scoping, closures, tail calls, the
-essential list operations, conditionals, `let`/`let*`/`letrec`/named let,
-`lambda`/`define` (including function shorthand), `and`/`or`, quasiquote,
-`do` loops, math functions, string utilities, and `error`. The main gaps are:
-no character type, no vectors, no macro system, no continuations, and no
-exact/inexact numeric distinction.
+**Overall**: ~69% of R5RS features supported (was ~58%). The interpreter covers
+the core subset needed for most programs: lexical scoping, closures, tail calls,
+the essential list operations (including all car/cdr compositions), conditionals,
+`let`/`let*`/`letrec`/named let, `lambda`/`define` (including function shorthand),
+`and`/`or`, quasiquote, `do` loops, full math (including transcendental functions),
+string utilities, `for-each`/`filter`, `string->number`/`number->string`, and
+`error`/`assert`. The main gaps are: no character type, no vectors, no macro
+system, no continuations, no exact/inexact numeric distinction, and no I/O ports.
